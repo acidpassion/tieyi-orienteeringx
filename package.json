@@ -1,0 +1,22 @@
+{
+  "name": "orienteeringx-quiz",
+  "version": "1.0.0",
+  "description": "Orienteering knowledge quiz platform",
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "cd backend && npm run dev",
+    "client": "cd client && npm run dev",
+    "build": "cd client && npm run build",
+    "start": "cd backend && npm start",
+    "install-all": "npm install && cd backend && npm install && cd ../client && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  },
+  "dependencies": {
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
+    "axios": "^1.12.2",
+    "typescript": "^5.9.2"
+  }
+}
