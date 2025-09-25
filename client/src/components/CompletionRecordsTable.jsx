@@ -256,7 +256,7 @@ const CompletionRecordsTable = ({ records = [], onEdit, onDelete }) => {
                   <div className="flex items-center text-sm text-gray-700 dark:text-gray-300">
                     <div>
                       <span className="text-xs text-gray-500 dark:text-gray-400 block">比赛项目</span>
-                      <span>{record.gameType || '未指定'}</span>
+                      <span>{typeof record.gameType === 'string' ? record.gameType : record.gameType?.name || '未指定'}</span>
                     </div>
                   </div>
                   

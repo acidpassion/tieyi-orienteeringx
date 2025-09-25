@@ -584,27 +584,31 @@ const StudentRoster = () => {
   const exportToPDF = async () => {
     if (!contentRef.current || !paginatedData) return;
     
+    // Store original viewport meta tag
+    const originalViewport = document.querySelector('meta[name="viewport"]');
+    const originalViewportContent = originalViewport ? originalViewport.getAttribute('content') : null;
+    
+    // Store original body and html styles
+    const originalBodyStyle = {
+      width: document.body.style.width,
+      minWidth: document.body.style.minWidth,
+      maxWidth: document.body.style.maxWidth,
+      margin: document.body.style.margin,
+      transform: document.body.style.transform,
+      zoom: document.body.style.zoom
+    };
+    
+    const originalHtmlStyle = {
+      width: document.documentElement.style.width,
+      minWidth: document.documentElement.style.minWidth,
+      maxWidth: document.documentElement.style.maxWidth
+    };
+    
+    // Store original window dimensions
+    const originalInnerWidth = window.innerWidth;
+    const originalInnerHeight = window.innerHeight;
+    
     try {
-      // Store original viewport meta tag
-      const originalViewport = document.querySelector('meta[name="viewport"]');
-      const originalViewportContent = originalViewport ? originalViewport.getAttribute('content') : null;
-      
-      // Store original body and html styles
-      const originalBodyStyle = {
-        width: document.body.style.width,
-        minWidth: document.body.style.minWidth,
-        maxWidth: document.body.style.maxWidth,
-        margin: document.body.style.margin,
-        transform: document.body.style.transform,
-        zoom: document.body.style.zoom
-      };
-      
-      const originalHtmlStyle = {
-        width: document.documentElement.style.width,
-        minWidth: document.documentElement.style.minWidth,
-        maxWidth: document.documentElement.style.maxWidth
-      };
-      
       // ULTRA-AGGRESSIVE viewport and layout override - completely isolate from browser window size
       if (originalViewport) {
         originalViewport.setAttribute('content', 'width=1600, initial-scale=1.0, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0, viewport-fit=cover');
@@ -614,10 +618,6 @@ const StudentRoster = () => {
         viewportMeta.content = 'width=1600, initial-scale=1.0, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0, viewport-fit=cover';
         document.head.appendChild(viewportMeta);
       }
-      
-      // Store original window dimensions
-      const originalInnerWidth = window.innerWidth;
-      const originalInnerHeight = window.innerHeight;
       
       // Override window dimensions to force consistent layout calculation
       Object.defineProperty(window, 'innerWidth', {

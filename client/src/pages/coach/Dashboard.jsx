@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import axios from '../../config/axiosConfig';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { createApiUrl } from '../../config/api';
-import { Users, ClipboardList, BookOpen, TrendingUp } from 'lucide-react';
+import { Users, ClipboardList, BookOpen, TrendingUp, Trophy, Calendar, MapPin } from 'lucide-react';
 
 const CoachDashboard = () => {
   const [stats, setStats] = useState({
@@ -12,11 +13,14 @@ const CoachDashboard = () => {
     completedAssignments: 0
   });
   const [recentAssignments, setRecentAssignments] = useState([]);
+  const [openEvents, setOpenEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [eventsLoading, setEventsLoading] = useState(true);
   const { getLocalizedText } = useLanguage();
 
   useEffect(() => {
     fetchDashboardData();
+    fetchOpenEvents();
   }, []);
 
   const fetchDashboardData = async () => {
@@ -44,6 +48,26 @@ const CoachDashboard = () => {
       console.error('Error fetching dashboard data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchOpenEvents = async () => {
+    try {
+      const response = await axios.get(createApiUrl('/api/events'));
+      const events = response.data;
+      
+      // Filter events that are open for registration
+      const openForRegistration = events.filter(event => {
+        const now = new Date();
+        const registrationEnd = new Date(event.registrationEndDate);
+        return registrationEnd > now && event.status === 'open';
+      });
+      
+      setOpenEvents(openForRegistration.slice(0, 5)); // Show latest 5 events
+    } catch (error) {
+      console.error('Error fetching events:', error);
+    } finally {
+      setEventsLoading(false);
     }
   };
 
@@ -139,7 +163,7 @@ const CoachDashboard = () => {
       </div>
 
       {/* Recent Assignments */}
-      <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
+      <div className="bg-white dark:bg-gray-800 shadow rounded-lg mb-8">
         <div className="px-4 py-5 sm:p-6">
           <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white mb-4">
             最近作业
@@ -178,6 +202,74 @@ const CoachDashboard = () => {
                   </li>
                 ))}
               </ul>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Open Events for Registration */}
+      <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
+        <div className="px-4 py-5 sm:p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
+              开放报名的赛事
+            </h3>
+            <Link 
+              to="/events" 
+              className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300"
+            >
+              查看全部
+            </Link>
+          </div>
+          {eventsLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          ) : openEvents.length === 0 ? (
+            <p className="text-gray-500 dark:text-gray-400">暂无开放报名的赛事。</p>
+          ) : (
+            <div className="grid gap-4">
+              {openEvents.map((event) => (
+                <div key={event._id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                        {event.name}
+                      </h4>
+                      <div className="mt-2 space-y-1">
+                        {event.location && (
+                          <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
+                            <MapPin className="h-4 w-4 mr-2 flex-shrink-0" />
+                            <span className="truncate">{event.location}</span>
+                          </div>
+                        )}
+                        {event.eventDate && (
+                          <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
+                            <Calendar className="h-4 w-4 mr-2 flex-shrink-0" />
+                            <span>{new Date(event.eventDate).toLocaleDateString('zh-CN')}</span>
+                          </div>
+                        )}
+                        {event.gameTypes && event.gameTypes.length > 0 && (
+                          <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
+                            <Trophy className="h-4 w-4 mr-2 flex-shrink-0" />
+                            <span className="truncate">
+                              {event.gameTypes.map(gt => typeof gt === 'string' ? gt : gt.name).join(', ')}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex-shrink-0 ml-4">
+                      <Link
+                        to={`/events/register/${event._id}`}
+                        className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800"
+                      >
+                        报名
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>

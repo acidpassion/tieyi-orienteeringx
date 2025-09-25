@@ -123,10 +123,22 @@ logger.logAuth = (action, userId, req, success = true, details = {}) => {
 };
 
 logger.logDatabase = (operation, collection, query = {}, result = {}) => {
+  // 避免对复杂对象进行JSON.stringify，这会导致数据被意外序列化
+  const safeQuery = typeof query === 'object' && query !== null ? 
+    Object.keys(query).reduce((acc, key) => {
+      // 只记录简单的查询信息，避免序列化复杂的嵌套对象
+      if (typeof query[key] === 'string' || typeof query[key] === 'number' || typeof query[key] === 'boolean') {
+        acc[key] = query[key];
+      } else {
+        acc[key] = '[Complex Object]';
+      }
+      return acc;
+    }, {}) : query;
+    
   logger.info('Database Operation', {
     operation,
     collection,
-    query: JSON.stringify(query),
+    query: safeQuery,
     resultCount: result.length || (result.acknowledged ? 1 : 0)
   });
 };

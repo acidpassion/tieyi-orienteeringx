@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
-import { User, Edit, Save, X, Calendar, MapPin, Trophy, Medal, Shield, BookOpen, Plus } from 'lucide-react';
+import { User, Edit, Save, X, Calendar, MapPin, Trophy, Medal, Shield, BookOpen, Plus, UserCheck, Clock, CheckCircle, XCircle, Share2, Users } from 'lucide-react';
 import CompletionRecordsTable from '../components/CompletionRecordsTable';
 import CompetitionRecordForm from '../components/CompetitionRecordForm';
+import axios from '../config/axiosConfig';
+import { createApiUrl } from '../config/api';
 
 
 const UserProfile = () => {
@@ -23,6 +25,8 @@ const UserProfile = () => {
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [events, setEvents] = useState([]);
   const [editFormData, setEditFormData] = useState(null);
+  const [registrations, setRegistrations] = useState([]);
+  const [loadingRegistrations, setLoadingRegistrations] = useState(false);
   
   // Get student ID from URL parameter, fallback to user.id
   const studentId = searchParams.get('id') || user?.id;
@@ -30,8 +34,14 @@ const UserProfile = () => {
   // Initialize activeTab based on URL parameter
   useEffect(() => {
     const tabParam = searchParams.get('tab');
-    if (tabParam === 'info' || tabParam === 'completionRecords') {
-      setActiveTab(tabParam === 'completionRecords' ? 'records' : tabParam);
+    if (tabParam === 'info' || tabParam === 'completionRecords' || tabParam === 'registrations') {
+      if (tabParam === 'completionRecords') {
+        setActiveTab('records');
+      } else if (tabParam === 'registrations') {
+        setActiveTab('registrations');
+      } else {
+        setActiveTab(tabParam);
+      }
     }
   }, [searchParams]);
 
@@ -43,9 +53,23 @@ const UserProfile = () => {
       newSearchParams.set('tab', 'info');
     } else if (tab === 'records') {
       newSearchParams.set('tab', 'completionRecords');
+    } else if (tab === 'registrations') {
+      newSearchParams.set('tab', 'registrations');
     }
     setSearchParams(newSearchParams);
+    
+    // Fetch registrations when switching to registrations tab
+    if (tab === 'registrations') {
+      fetchUserRegistrations();
+    }
   };
+
+  // Fetch registrations on component mount if registrations tab is active
+  useEffect(() => {
+    if (activeTab === 'registrations') {
+      fetchUserRegistrations();
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     console.log('UserProfile: user object:', user);
@@ -58,6 +82,112 @@ const UserProfile = () => {
     fetchProfile();
     fetchEvents();
   }, [user, studentId]);
+
+  // Fetch user registrations
+  const fetchUserRegistrations = async () => {
+    try {
+      setLoadingRegistrations(true);
+      const token = localStorage.getItem('token');
+      const response = await axios.get(createApiUrl('/api/registrations/my'), {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setRegistrations(response.data || []);
+    } catch (error) {
+      console.error('获取报名信息失败:', error);
+      toast.error('获取报名信息失败');
+    } finally {
+      setLoadingRegistrations(false);
+    }
+  };
+
+  // Cancel registration
+  const handleCancelRegistration = async (registrationId) => {
+    if (!window.confirm('确定要取消这个报名吗？')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(createApiUrl(`/api/registrations/${registrationId}`), {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      toast.success('报名已取消');
+      fetchUserRegistrations(); // Refresh registrations
+    } catch (error) {
+      console.error('取消报名失败:', error);
+      const errorMessage = error.response?.data?.message || '取消报名失败';
+      toast.error(errorMessage);
+    }
+  };
+
+  // Format date
+  const formatDate = (dateString) => {
+    if (!dateString) return '未设置';
+    return new Date(dateString).toLocaleDateString('zh-CN', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  // Get status icon
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'confirmed':
+        return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case 'pending':
+        return <Clock className="h-4 w-4 text-yellow-500" />;
+      case 'cancelled':
+        return <XCircle className="h-4 w-4 text-red-500" />;
+      default:
+        return null;
+    }
+  };
+
+  // Get status text
+  const getStatusText = (status) => {
+    switch (status) {
+      case 'confirmed': return '已确认';
+      case 'pending': return '待确认';
+      case 'cancelled': return '已取消';
+      default: return '未知状态';
+    }
+  };
+
+  // Check if registration has relay or team game types
+  const hasRelayOrTeamGame = (registration) => {
+    if (!registration.gameTypes) return false;
+    return registration.gameTypes.some(gameType => {
+      const gameTypeName = typeof gameType === 'string' ? gameType : gameType.name;
+      return gameTypeName && (gameTypeName.includes('接力') || gameTypeName === '团队赛');
+    });
+  };
+
+  // Handle share registration for specific game type
+  const handleShareRegistration = async (registration, gameType) => {
+    try {
+      if (!gameType.inviteCode) {
+        toast.error('该游戏类型没有邀请码，无法分享');
+        return;
+      }
+      const shareUrl = `${window.location.origin}/join-relay/${gameType.inviteCode}`;
+      await navigator.clipboard.writeText(shareUrl);
+      const gameTypeName = typeof gameType === 'string' ? gameType : gameType.name;
+      toast.success(`${gameTypeName} 分享链接已复制到剪贴板！`);
+    } catch (error) {
+      console.error('复制链接失败:', error);
+      toast.error('复制链接失败');
+    }
+  };
+
+  // Get relay/team game types with invite codes
+  const getShareableGameTypes = (registration) => {
+    if (!registration.gameTypes) return [];
+    return registration.gameTypes.filter(gameType => {
+      const gameTypeName = typeof gameType === 'string' ? gameType : gameType.name;
+      return gameType.inviteCode && (gameTypeName.includes('接力') || gameTypeName.includes('团队'));
+    });
+  };
 
   const fetchProfile = async () => {
     if (!studentId) {
@@ -464,13 +594,6 @@ const UserProfile = () => {
     setEditFormData(null);
   };
 
-
-
-  const formatDate = (dateString) => {
-    if (!dateString) return '未设置';
-    return new Date(dateString).toLocaleDateString('zh-CN');
-  };
-
   const calculateAge = (birthday) => {
     if (!birthday) return null;
     const birthDate = new Date(birthday);
@@ -841,6 +964,21 @@ const UserProfile = () => {
                 </span>
               )}
             </button>
+            <button
+              onClick={() => handleTabChange('registrations')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
+                activeTab === 'registrations'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+              }`}
+            >
+              报名记录
+              {registrations.length > 0 && (
+                <span className="ml-2 bg-green-100 text-green-600 text-xs px-2 py-1 rounded-full">
+                  {registrations.length}
+                </span>
+              )}
+            </button>
           </nav>
         </div>
 
@@ -914,6 +1052,113 @@ const UserProfile = () => {
                 onEdit={handleEditRecord}
                 onDelete={handleDeleteRecord}
               />
+            </div>
+          )}
+
+          {activeTab === 'registrations' && (
+            <div>
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white">报名记录</h3>
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  共 {registrations.length} 条记录
+                </div>
+              </div>
+              
+              {loadingRegistrations ? (
+                <div className="flex justify-center items-center h-32">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+              ) : registrations.length === 0 ? (
+                <div className="text-center py-12">
+                  <UserCheck className="mx-auto h-12 w-12 text-gray-400" />
+                  <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">暂无报名记录</h3>
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">您还没有报名参加任何赛事</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {registrations.map((registration) => (
+                    <div key={registration._id} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2 mb-2">
+                            <h4 className="text-lg font-medium text-gray-900 dark:text-white">
+                              {registration.event?.eventName || '未知赛事'}
+                            </h4>
+                            <div className="flex items-center space-x-1">
+                              {getStatusIcon(registration.status)}
+                              <span className={`text-sm ${
+                                registration.status === 'confirmed' ? 'text-green-600' :
+                                registration.status === 'pending' ? 'text-yellow-600' :
+                                'text-red-600'
+                              }`}>
+                                {getStatusText(registration.status)}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600 dark:text-gray-400">
+                            <div className="flex items-center space-x-2">
+                              <Calendar className="h-4 w-4" />
+                              <span>赛事时间: {formatDate(registration.event?.startDate)} - {formatDate(registration.event?.endDate)}</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <MapPin className="h-4 w-4" />
+                              <span>地点: {registration.event?.location || '待定'}</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Trophy className="h-4 w-4" />
+                              <span>报名项目: {registration.gameTypes?.map(gt => typeof gt === 'string' ? gt : gt.name).join(', ') || '无'}</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Clock className="h-4 w-4" />
+                              <span>报名时间: {formatDate(registration.registrationDate)}</span>
+                            </div>
+                          </div>
+                          
+                          {registration.relayTeam && (
+                            <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                              <div className="flex items-center space-x-2 text-sm">
+                                <Users className="h-4 w-4 text-blue-600" />
+                                <span className="font-medium text-blue-900 dark:text-blue-100">
+                                  接力团队: {registration.relayTeam.teamName}
+                                </span>
+                              </div>
+                              <div className="mt-1 text-xs text-blue-700 dark:text-blue-300">
+                                成员: {registration.relayTeam.members?.map(m => m.name).join(', ') || '无'}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="flex flex-col space-y-2 ml-4">
+                          {getShareableGameTypes(registration).map((gameType, index) => {
+                            const gameTypeName = typeof gameType === 'string' ? gameType : gameType.name;
+                            return (
+                              <button
+                                key={index}
+                                onClick={() => handleShareRegistration(registration, gameType)}
+                                className="flex items-center space-x-1 px-3 py-1 text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 border border-blue-300 hover:border-blue-400 rounded transition-colors"
+                                title={`分享 ${gameTypeName} 邀请链接`}
+                              >
+                                <Share2 className="h-3 w-3" />
+                                <span>分享 {gameTypeName}</span>
+                              </button>
+                            );
+                          })}
+                          {registration.status === 'pending' && (
+                            <button
+                              onClick={() => handleCancelRegistration(registration._id)}
+                              className="px-3 py-1 text-sm text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 border border-red-300 hover:border-red-400 rounded transition-colors"
+                            >
+                              取消报名
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

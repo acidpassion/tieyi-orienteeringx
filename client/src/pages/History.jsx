@@ -45,7 +45,7 @@ const History = () => {
     }
 
     try {
-      await axios.delete(`/api/results/${resultId}`);
+      await axios.delete(createApiUrl(`/api/results/${resultId}`));
       // Remove the deleted result from the state
       setResults(results.filter(result => result._id !== resultId));
       toast.success(getLocalizedText('Quiz result deleted successfully', '测验记录删除成功'));

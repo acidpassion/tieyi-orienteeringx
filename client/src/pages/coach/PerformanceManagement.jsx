@@ -726,7 +726,7 @@ const PerformanceManagement = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900 dark:text-white">
-                              {record.gameType}
+                              {typeof record.gameType === 'string' ? record.gameType : record.gameType?.name || record.gameType}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
@@ -837,7 +837,7 @@ const PerformanceManagement = () => {
                       <div className="mt-3 grid grid-cols-4 gap-4 text-sm">
                         <div>
                           <span className="text-gray-500 dark:text-gray-400">比赛项目:</span>
-                          <div className="font-medium text-gray-900 dark:text-white">{record.gameType}</div>
+                          <div className="font-medium text-gray-900 dark:text-white">{typeof record.gameType === 'string' ? record.gameType : record.gameType?.name || record.gameType}</div>
                         </div>
                         <div>
                           <span className="text-gray-500 dark:text-gray-400">组别:</span>

@@ -285,4 +285,83 @@ router.post('/change-password', auth.verifyToken, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/auth/profile:
+ *   get:
+ *     summary: Get current user profile
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User profile retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 _id:
+ *                   type: string
+ *                 name:
+ *                   type: string
+ *                 username:
+ *                   type: string
+ *                 grade:
+ *                   type: string
+ *                 avatar:
+ *                   type: string
+ *                 role:
+ *                   type: string
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Server error
+ */
+router.get('/profile', auth.verifyToken, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    
+    logger.info('Profile request', {
+      requestId: req.requestId,
+      userId: userId
+    });
+    
+    // Find user by ID
+    const user = await Student.findById(userId).select('-password');
+    
+    if (!user) {
+      logger.warn('User not found for profile request', {
+        requestId: req.requestId,
+        userId: userId
+      });
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    logger.info('Profile retrieved successfully', {
+      requestId: req.requestId,
+      userId: userId,
+      userName: user.name
+    });
+    
+    res.json({
+      _id: user._id,
+      name: user.name,
+      username: user.username || user.name,
+      grade: user.grade,
+      avatar: user.avatar,
+      role: user.role
+    });
+  } catch (error) {
+    logger.logError(error, req);
+    logger.error('Profile request error', {
+      requestId: req.requestId,
+      error: error.message
+    });
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 module.exports = router;

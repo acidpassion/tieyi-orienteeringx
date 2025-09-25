@@ -16,6 +16,8 @@ const studentRoutes = require('./routes/students');
 const quizSessionRoutes = require('./routes/quizSessions');
 const completionRecordRoutes = require('./routes/completionRecords');
 const eventRoutes = require('./routes/events');
+const registrationRoutes = require('./routes/registrations');
+const relayTeamRoutes = require('./routes/relayTeams');
 
 const app = express();
 
@@ -46,6 +48,8 @@ app.use('/api/students', studentRoutes);
 app.use('/api/quiz-sessions', quizSessionRoutes);
 app.use('/api/completion-records', completionRecordRoutes);
 app.use('/api/events', eventRoutes);
+app.use('/api/registrations', registrationRoutes);
+app.use('/api/relay-teams', relayTeamRoutes);
 
 // 404 handler
 app.use('*', handle404);

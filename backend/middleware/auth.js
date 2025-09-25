@@ -15,9 +15,9 @@ const verifyToken = async (req, res, next) => {
 
     console.log('🔍 Verifying token...');
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log('✅ Token decoded:', { userId: decoded.userId, role: decoded.role });
+    console.log('✅ Token decoded:', { userId: decoded._id || decoded.userId, role: decoded.role });
     
-    const user = await Student.findById(decoded.userId).select('-password');
+    const user = await Student.findById(decoded._id || decoded.userId).select('-password');
     
     if (!user) {
       console.log('❌ User not found for token');

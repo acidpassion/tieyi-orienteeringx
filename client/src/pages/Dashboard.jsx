@@ -4,12 +4,14 @@ import axios from '../config/axiosConfig';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { createApiUrl } from '../config/api';
-import { Clock, Calendar, BookOpen, Play, CheckCircle } from 'lucide-react';
+import { Clock, Calendar, BookOpen, Play, CheckCircle, Trophy, MapPin, Users } from 'lucide-react';
 
 const Dashboard = () => {
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [quizResults, setQuizResults] = useState({});
+  const [openEvents, setOpenEvents] = useState([]);
+  const [eventsLoading, setEventsLoading] = useState(true);
   const { getLocalizedText } = useLanguage();
   const { user } = useAuth();
 
@@ -17,6 +19,7 @@ const Dashboard = () => {
     if (user) {
       fetchAssignments();
       fetchQuizResults();
+      fetchOpenEvents();
     }
   }, [user]);
 
@@ -46,6 +49,17 @@ const Dashboard = () => {
     }
   };
 
+  const fetchOpenEvents = async () => {
+    try {
+      const response = await axios.get(createApiUrl('/api/events/open'));
+      setOpenEvents(response.data || []);
+    } catch (error) {
+      console.error('Error fetching open events:', error);
+    } finally {
+      setEventsLoading(false);
+    }
+  };
+
   const formatDueDate = (date) => {
     return new Date(date).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -53,6 +67,15 @@ const Dashboard = () => {
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
+    });
+  };
+
+  const formatEventDate = (date) => {
+    if (!date) return '待定';
+    return new Date(date).toLocaleDateString('zh-CN', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
     });
   };
 
@@ -76,8 +99,90 @@ const Dashboard = () => {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">我的作业</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">仪表板</h1>
         <p className="mt-2 text-gray-600 dark:text-gray-400">
+          查看您的作业和可报名的赛事
+        </p>
+      </div>
+
+      {/* Open Events Section */}
+      <div className="mb-12">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">开放报名的赛事</h2>
+          <Link
+            to="/events/register"
+            className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium"
+          >
+            查看全部 →
+          </Link>
+        </div>
+
+        {eventsLoading ? (
+          <div className="flex items-center justify-center h-32">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+        ) : openEvents.length === 0 ? (
+          <div className="text-center py-8 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            <Trophy className="mx-auto h-8 w-8 text-gray-400" />
+            <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">暂无开放报名的赛事</h3>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              目前没有可报名的赛事，请稍后查看。
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {openEvents.slice(0, 3).map((event) => (
+              <div
+                key={event._id}
+                className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow"
+              >
+                <div className="p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white line-clamp-2">
+                      {event.eventName}
+                    </h3>
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 ml-2 flex-shrink-0">
+                      报名中
+                    </span>
+                  </div>
+                  
+                  <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    <div className="flex items-center">
+                      <Calendar className="h-4 w-4 mr-2 flex-shrink-0" />
+                      <span>{formatEventDate(event.startDate)} - {formatEventDate(event.endDate)}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <MapPin className="h-4 w-4 mr-2 flex-shrink-0" />
+                      <span className="truncate">{event.location || '待定'}</span>
+                    </div>
+                    {event.gameTypes && event.gameTypes.length > 0 && (
+                      <div className="flex items-center">
+                        <Trophy className="h-4 w-4 mr-2 flex-shrink-0" />
+                        <span className="truncate">
+                          {event.gameTypes.map(gt => typeof gt === 'string' ? gt : gt.name).join(', ')}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <Link
+                    to="/events/register"
+                    className="w-full flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                  >
+                    <Users className="h-4 w-4 mr-2" />
+                    立即报名
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Assignments Section */}
+      <div className="mb-8">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">我的作业</h2>
+        <p className="mt-2 text-gray-600 dark:text-gray-400 mb-6">
           请在截止日期前完成分配的测验
         </p>
       </div>

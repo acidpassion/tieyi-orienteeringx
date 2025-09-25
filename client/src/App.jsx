@@ -24,6 +24,11 @@ import StudentPersonalProfile from './pages/StudentProfile';
 import UserProfile from './pages/UserProfile';
 import DashboardRedirect from './components/DashboardRedirect';
 import CoachEvents from './pages/coach/Events';
+import EventEdit from './pages/coach/EventEdit';
+import EventRegistrations from './pages/coach/EventRegistrations';
+import EventRegistration from './pages/EventRegistration';
+import EventRegistrationDetail from './pages/EventRegistrationDetail';
+import JoinRelayTeam from './pages/JoinRelayTeam';
 import ITEvents from './pages/it/Events';
 
 function App() {
@@ -192,6 +197,66 @@ function App() {
                 <ProtectedRoute>
                   <Layout>
                     <CoachEvents />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/coach/events/new"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <EventEdit />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/coach/events/:id"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <EventEdit />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/coach/events/:id/registrations"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <EventRegistrations />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/events/register"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <EventRegistration />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/events/register/:id"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <EventRegistrationDetail />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/join-relay/:inviteCode"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <JoinRelayTeam />
                   </Layout>
                 </ProtectedRoute>
               }

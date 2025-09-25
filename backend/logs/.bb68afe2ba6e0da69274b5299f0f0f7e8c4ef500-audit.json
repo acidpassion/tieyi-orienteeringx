@@ -6,16 +6,6 @@
     "auditLog": "/Users/alex/dev/orienteering_quiz_app/backend/logs/.bb68afe2ba6e0da69274b5299f0f0f7e8c4ef500-audit.json",
     "files": [
         {
-            "date": 1757425691674,
-            "name": "/Users/alex/dev/orienteering_quiz_app/backend/logs/application-2025-09-09.log",
-            "hash": "5182b1ad44c25e987804b5a09572881b5aef2ee4f26f6a99fbc28a81f3e826f6"
-        },
-        {
-            "date": 1757515491108,
-            "name": "/Users/alex/dev/orienteering_quiz_app/backend/logs/application-2025-09-10.log",
-            "hash": "0063330ed087d446020b20f468ca9685f2273f52dee1e8a4ff1dae30dc6cbd07"
-        },
-        {
             "date": 1757600319032,
             "name": "/Users/alex/dev/orienteering_quiz_app/backend/logs/application-2025-09-11.log",
             "hash": "7b3b651133c42251eec6e8ae431d753b4e7437bf81695b50b9d73dfcd068b283"
@@ -64,6 +54,21 @@
             "date": 1758384637326,
             "name": "/Users/alex/dev/orienteering_quiz_app/backend/logs/application-2025-09-21.log",
             "hash": "6fdbffced31ad36b826aaef0bcb962073ab2ee3039e7cf8e6dec939102a142d5"
+        },
+        {
+            "date": 1758609014527,
+            "name": "/Users/alex/dev/orienteering_quiz_app/backend/logs/application-2025-09-23.log",
+            "hash": "85d868fb287c36e715f6b6352a3afa7ca97dfaa407298f683802ee05b3935f26"
+        },
+        {
+            "date": 1758643255540,
+            "name": "/Users/alex/dev/orienteering_quiz_app/backend/logs/application-2025-09-24.log",
+            "hash": "f68f32e7931a85548955c913d4cd6bc428b4568cb6a1b471b002da1e5221460a"
+        },
+        {
+            "date": 1758756664729,
+            "name": "/Users/alex/dev/orienteering_quiz_app/backend/logs/application-2025-09-25.log",
+            "hash": "e0530093e6f6bd88a731d5da416fc321d731681fdc6e288a27affff53cd97523"
         }
     ],
     "hashType": "sha256"

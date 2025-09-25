@@ -19,7 +19,7 @@ const QuizResult = () => {
 
   const fetchResult = async () => {
     try {
-      const response = await axios.get(`/api/results/${id}`);
+      const response = await axios.get(createApiUrl(`/api/results/${id}`));
       setResult(response.data);
     } catch (error) {
       console.error('Error fetching result:', error);

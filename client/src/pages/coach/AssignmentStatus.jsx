@@ -22,7 +22,7 @@ const AssignmentStatus = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await axios.get(`/api/assignments/${assignmentId}/status`, {
+      const response = await axios.get(createApiUrl(`/api/assignments/${assignmentId}/status`), {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -41,7 +41,7 @@ const AssignmentStatus = () => {
     try {
       setResultLoading(true);
       const token = localStorage.getItem('token');
-      const response = await axios.get(`/api/assignments/${assignmentId}/student/${studentId}/result`, {
+      const response = await axios.get(createApiUrl(`/api/assignments/${assignmentId}/student/${studentId}/result`), {
         headers: {
           'Authorization': `Bearer ${token}`
         }

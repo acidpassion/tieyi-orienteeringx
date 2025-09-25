@@ -27,6 +27,34 @@ const router = express.Router();
  *           format: date
  *         eventType:
  *           type: string
+ *         location:
+ *           type: string
+ *         scoreWeight:
+ *           type: number
+ *         openRegistration:
+ *           type: boolean
+ *         gameTypes:
+ *           type: array
+ *           items:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               teamSize:
+ *                 type: number
+ *         groups:
+ *           type: array
+ *           items:
+ *             type: object
+ *             properties:
+ *               code:
+ *                 type: string
+ *               name:
+ *                 type: string
+ *               ageRange:
+ *                 type: string
+ *               gender:
+ *                 type: string
  */
 
 /**
@@ -66,63 +94,6 @@ const router = express.Router();
  *                 $ref: '#/components/schemas/Event'
  *       500:
  *         description: Server error
- */
-router.get('/', verifyToken, verifyCoachOrStudent, async (req, res) => {
-  const requestId = req.requestId;
-  logger.info('HTTP Request', {
-    requestId,
-    method: 'GET',
-    url: '/api/events',
-    userId: req.user._id
-  });
-  
-  try {
-    const { search, startDate, endDate } = req.query;
-    
-    // Build query filter
-    let filter = {};
-    
-    // Text search filter
-    if (search && search.trim()) {
-      filter.$or = [
-        { eventName: { $regex: search.trim(), $options: 'i' } },
-        { organization: { $regex: search.trim(), $options: 'i' } }
-      ];
-    }
-    
-    // Date range filter
-    if (startDate || endDate) {
-      filter.startDate = {};
-      if (startDate) {
-        filter.startDate.$gte = new Date(startDate);
-      }
-      if (endDate) {
-        filter.startDate.$lte = new Date(endDate);
-      }
-    }
-    
-    logger.logDatabase('Finding events with filter', 'events', { filter }, {});
-    
-    const events = await Event.find(filter)
-      .sort({ startDate: -1 });
-    
-    logger.info('Events retrieved successfully', {
-      requestId,
-      count: events.length,
-      filter,
-      userId: req.user._id
-    });
-    
-    res.json(events);
-  } catch (error) {
-    logger.logError(error, req);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-/**
- * @swagger
- * /api/events:
  *   post:
  *     summary: Create new event (coach and IT only)
  *     tags: [Events]
@@ -153,6 +124,20 @@ router.get('/', verifyToken, verifyCoachOrStudent, async (req, res) => {
  *                 format: date
  *               eventType:
  *                 type: string
+ *               location:
+ *                 type: string
+ *               scoreWeight:
+ *                 type: number
+ *               openRegistration:
+ *                 type: boolean
+ *               gameTypes:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *               groups:
+ *                 type: array
+ *                 items:
+ *                   type: object
  *     responses:
  *       201:
  *         description: Event created successfully
@@ -161,6 +146,71 @@ router.get('/', verifyToken, verifyCoachOrStudent, async (req, res) => {
  *       500:
  *         description: Server error
  */
+router.get('/', verifyToken, verifyCoachOrStudent, async (req, res) => {
+  const requestId = req.requestId;
+  logger.info('HTTP Request', {
+    requestId,
+    method: 'GET',
+    url: '/api/events',
+    userId: req.user._id
+  });
+  
+  try {
+    const { search, startDate, endDate, openRegistration } = req.query;
+    
+    // Build query filter
+    let filter = {};
+    
+    // Text search filter
+    if (search && search.trim()) {
+      filter.$or = [
+        { eventName: { $regex: search.trim(), $options: 'i' } },
+        { organization: { $regex: search.trim(), $options: 'i' } }
+      ];
+    }
+    
+    // Date range filter
+    if (startDate || endDate) {
+      filter.startDate = {};
+      if (startDate) {
+        filter.startDate.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        filter.startDate.$lte = new Date(endDate);
+      }
+    }
+    
+    // Open registration filter
+    if (openRegistration === 'true') {
+      filter.openRegistration = true;
+      // Also filter for future events when filtering by open registration
+      const now = new Date();
+      if (!filter.startDate) {
+        filter.startDate = {};
+      }
+      filter.startDate.$gt = now;
+    }
+    
+    logger.logDatabase('Finding events with filter', 'events', { filter }, {});
+    
+    const events = await Event.find(filter)
+      .sort({ startDate: -1 });
+    
+    logger.info('Events retrieved successfully', {
+      requestId,
+      count: events.length,
+      filter,
+      userId: req.user._id
+    });
+    
+    res.json(events);
+  } catch (error) {
+    logger.logError(error, req);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+
 router.post('/', verifyToken, verifyCoach, async (req, res) => {
   const requestId = req.requestId;
   logger.info('HTTP Request', {
@@ -172,7 +222,18 @@ router.post('/', verifyToken, verifyCoach, async (req, res) => {
   });
   
   try {
-    const { eventName, organization, startDate, endDate, eventType } = req.body;
+    const { 
+      eventName, 
+      organization, 
+      startDate, 
+      endDate, 
+      eventType,
+      location,
+      scoreWeight,
+      openRegistration,
+      gameTypes,
+      groups
+    } = req.body;
     
     // Validate required fields
     if (!eventName || !organization || !startDate || !endDate || !eventType) {
@@ -191,7 +252,12 @@ router.post('/', verifyToken, verifyCoach, async (req, res) => {
       organization,
       startDate: start,
       endDate: end,
-      eventType
+      eventType,
+      location: location || '',
+      scoreWeight: scoreWeight || 1,
+      openRegistration: openRegistration !== undefined ? openRegistration : false,
+      gameTypes: gameTypes || [],
+      groups: groups || []
     });
     
     logger.logDatabase('Creating new event', 'events', {}, event.toObject());
@@ -217,7 +283,137 @@ router.post('/', verifyToken, verifyCoach, async (req, res) => {
 
 /**
  * @swagger
+ * /api/events/open:
+ *   get:
+ *     summary: Get events with open registration (for students)
+ *     tags: [Events]
+ *     responses:
+ *       200:
+ *         description: List of events with open registration
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Event'
+ *       500:
+ *         description: Server error
+ */
+router.get('/open', verifyToken, async (req, res) => {
+  const requestId = req.requestId;
+  logger.info('HTTP Request', {
+    requestId,
+    method: 'GET',
+    url: '/api/events/open',
+    userId: req.user ? req.user._id : 'anonymous'
+  });
+  
+  try {
+    const now = new Date();
+    
+    // Filter for events with open registration and future start dates
+    const filter = {
+      openRegistration: true,
+      endDate: { $gte: now }
+    };
+    
+    logger.logDatabase('Finding open registration events', 'events', { filter }, {});
+    
+    const events = await Event.find(filter)
+      .sort({ startDate: 1 });
+    
+    logger.info('Open registration events retrieved successfully', {
+      requestId,
+      count: events.length,
+      filter
+    });
+    
+    res.json(events);
+  } catch (error) {
+    logger.logError(error, req);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/events/types:
+ *   get:
+ *     summary: Get distinct event types
+ *     tags: [Events]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of distinct event types
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: string
+ *       500:
+ *         description: Server error
+ */
+router.get('/types', verifyToken, verifyCoachOrStudent, async (req, res) => {
+  const requestId = req.requestId;
+  logger.info('HTTP Request', {
+    requestId,
+    method: 'GET',
+    url: '/api/events/types',
+    userId: req.user._id
+  });
+  
+  try {
+    logger.logDatabase('Getting distinct event types', 'events', {});
+    
+    const eventTypes = await Event.distinct('eventType');
+    
+    // Filter out null/undefined values and sort
+    const filteredTypes = eventTypes
+      .filter(type => type && type.trim())
+      .sort();
+    
+    logger.info('Event types retrieved successfully', {
+      requestId,
+      count: filteredTypes.length,
+      types: filteredTypes,
+      userId: req.user._id
+    });
+    
+    res.json(filteredTypes);
+  } catch (error) {
+    logger.logError(error, req);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+/**
+ * @swagger
  * /api/events/{id}:
+ *   get:
+ *     summary: Get event by ID (coach and IT only)
+ *     tags: [Events]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Event ID
+ *     responses:
+ *       200:
+ *         description: Event details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Event'
+ *       404:
+ *         description: Event not found
+ *       500:
+ *         description: Server error
  *   put:
  *     summary: Update event (coach and IT only)
  *     tags: [Events]
@@ -258,7 +454,60 @@ router.post('/', verifyToken, verifyCoach, async (req, res) => {
  *         description: Event not found
  *       500:
  *         description: Server error
+ *   delete:
+ *     summary: Delete event (coach and IT only)
+ *     tags: [Events]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Event ID
+ *     responses:
+ *       200:
+ *         description: Event deleted successfully
+ *       400:
+ *         description: Cannot delete event with associated records
+ *       404:
+ *         description: Event not found
+ *       500:
+ *         description: Server error
  */
+router.get('/:id', verifyToken, verifyCoachOrStudent, async (req, res) => {
+  const requestId = req.requestId;
+  logger.info('HTTP Request', {
+    requestId,
+    method: 'GET',
+    url: `/api/events/${req.params.id}`,
+    userId: req.user._id
+  });
+  
+  try {
+    logger.logDatabase('Finding event by ID', 'events', { _id: req.params.id }, {});
+    
+    const event = await Event.findById(req.params.id);
+    
+    if (!event) {
+      return res.status(404).json({ message: '赛事未找到' });
+    }
+    
+    logger.info('Event retrieved successfully', {
+      requestId,
+      eventId: event._id,
+      eventName: event.eventName,
+      userId: req.user._id
+    });
+    
+    res.json(event);
+  } catch (error) {
+    logger.logError(error, req);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 router.put('/:id', verifyToken, verifyCoach, async (req, res) => {
   const requestId = req.requestId;
   logger.info('HTTP Request', {
@@ -270,7 +519,18 @@ router.put('/:id', verifyToken, verifyCoach, async (req, res) => {
   });
   
   try {
-    const { eventName, organization, startDate, endDate, eventType } = req.body;
+    const { 
+      eventName, 
+      organization, 
+      startDate, 
+      endDate, 
+      eventType,
+      location,
+      scoreWeight,
+      openRegistration,
+      gameTypes,
+      groups
+    } = req.body;
     
     // Validate date range if both dates are provided
     if (startDate && endDate) {
@@ -287,6 +547,12 @@ router.put('/:id', verifyToken, verifyCoach, async (req, res) => {
     if (startDate !== undefined) updateData.startDate = new Date(startDate);
     if (endDate !== undefined) updateData.endDate = new Date(endDate);
     if (eventType !== undefined) updateData.eventType = eventType;
+    if (location !== undefined) updateData.location = location;
+    if (scoreWeight !== undefined) updateData.scoreWeight = scoreWeight;
+    if (openRegistration !== undefined) updateData.openRegistration = openRegistration;
+    if (gameTypes !== undefined) updateData.gameTypes = gameTypes;
+    if (groups !== undefined) updateData.groups = groups;
+
     
     logger.logDatabase('Updating event', 'events', { _id: req.params.id }, updateData);
     
@@ -317,31 +583,7 @@ router.put('/:id', verifyToken, verifyCoach, async (req, res) => {
   }
 });
 
-/**
- * @swagger
- * /api/events/{id}:
- *   delete:
- *     summary: Delete event (coach and IT only)
- *     tags: [Events]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Event ID
- *     responses:
- *       200:
- *         description: Event deleted successfully
- *       400:
- *         description: Cannot delete event with associated records
- *       404:
- *         description: Event not found
- *       500:
- *         description: Server error
- */
+
 router.delete('/:id', verifyToken, verifyCoach, async (req, res) => {
   const requestId = req.requestId;
   logger.info('HTTP Request', {
@@ -391,59 +633,6 @@ router.delete('/:id', verifyToken, verifyCoach, async (req, res) => {
     });
     
     res.json({ message: '赛事删除成功' });
-  } catch (error) {
-    logger.logError(error, req);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-/**
- * @swagger
- * /api/events/types:
- *   get:
- *     summary: Get distinct event types
- *     tags: [Events]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of distinct event types
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: string
- *       500:
- *         description: Server error
- */
-router.get('/types', verifyToken, verifyCoachOrStudent, async (req, res) => {
-  const requestId = req.requestId;
-  logger.info('HTTP Request', {
-    requestId,
-    method: 'GET',
-    url: '/api/events/types',
-    userId: req.user._id
-  });
-  
-  try {
-    logger.logDatabase('Getting distinct event types', 'events', {}, {});
-    
-    const eventTypes = await Event.distinct('eventType');
-    
-    // Filter out null/undefined values and sort
-    const filteredTypes = eventTypes
-      .filter(type => type && type.trim())
-      .sort();
-    
-    logger.info('Event types retrieved successfully', {
-      requestId,
-      count: filteredTypes.length,
-      types: filteredTypes,
-      userId: req.user._id
-    });
-    
-    res.json(filteredTypes);
   } catch (error) {
     logger.logError(error, req);
     res.status(500).json({ message: 'Server error' });

@@ -1,37 +1,23 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from '../../config/axiosConfig';
 import { toast } from 'react-toastify';
 import { createApiUrl } from '../../config/api';
-import { Calendar, Search, Edit, X, Save, Plus, Trash2, Filter } from 'lucide-react';
+import { Calendar, Search, Edit, Plus, Trash2, Filter, Users, BarChart3 } from 'lucide-react';
 import statics from '../../assets/statics.json';
 
 const Events = () => {
+  const navigate = useNavigate();
   const [events, setEvents] = useState([]);
   const [filteredEvents, setFilteredEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [startDateFilter, setStartDateFilter] = useState('');
   const [endDateFilter, setEndDateFilter] = useState('');
-  const [showEventModal, setShowEventModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingEvent, setDeletingEvent] = useState(null);
-  const [isCreatingNew, setIsCreatingNew] = useState(false);
-  const [editingEvent, setEditingEvent] = useState(null);
-  const [saving, setSaving] = useState(false);
 
-  // Organization and event type options
-  const organizationOptions = statics.orgs;
 
-  const eventTypeOptions = statics.eventTypes;
-
-  // Form state
-  const [formData, setFormData] = useState({
-    eventName: '',
-    organization: '',
-    startDate: '',
-    endDate: '',
-    eventType: ''
-  });
 
   // Fetch events from API
   const fetchEvents = async () => {
@@ -39,12 +25,7 @@ const Events = () => {
       setLoading(true);
       const token = localStorage.getItem('token');
       const response = await axios.get(createApiUrl('/api/events'), {
-        headers: { Authorization: `Bearer ${token}` },
-        params: {
-          search: searchTerm,
-          startDate: startDateFilter,
-          endDate: endDateFilter
-        }
+        headers: { Authorization: `Bearer ${token}` }
       });
       setEvents(response.data);
       setFilteredEvents(response.data);
@@ -78,89 +59,17 @@ const Events = () => {
 
   // Handle create new event
   const handleCreateNew = () => {
-    setIsCreatingNew(true);
-    setEditingEvent(null);
-    setFormData({
-      eventName: '',
-      organization: '',
-      startDate: '',
-      endDate: '',
-      eventType: ''
-    });
-    setShowEventModal(true);
+    navigate('/coach/events/new');
   };
 
   // Handle edit event
   const handleEdit = (event) => {
-    setIsCreatingNew(false);
-    setEditingEvent(event);
-    setFormData({
-      eventName: event.eventName,
-      organization: event.organization,
-      startDate: event.startDate.split('T')[0], // Format date for input
-      endDate: event.endDate.split('T')[0],
-      eventType: event.eventType
-    });
-    setShowEventModal(true);
+    navigate(`/coach/events/${event._id}`);
   };
 
-  // Handle save event (create or update)
-  const handleSave = async () => {
-    try {
-      // Validation
-      if (!formData.eventName.trim()) {
-        toast.error('请输入赛事名称');
-        return;
-      }
-      if (!formData.organization) {
-        toast.error('请选择主办方');
-        return;
-      }
-      if (!formData.startDate) {
-        toast.error('请选择开始日期');
-        return;
-      }
-      if (!formData.endDate) {
-        toast.error('请选择结束日期');
-        return;
-      }
-      if (!formData.eventType) {
-        toast.error('请选择赛事类型');
-        return;
-      }
-
-      // Validate date range
-      if (new Date(formData.endDate) < new Date(formData.startDate)) {
-        toast.error('结束日期必须在开始日期之后');
-        return;
-      }
-
-      setSaving(true);
-      const token = localStorage.getItem('token');
-      
-      if (isCreatingNew) {
-        // Create new event
-        await axios.post(createApiUrl('/api/events'), formData, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        toast.success('赛事创建成功');
-      } else {
-        // Update existing event
-        await axios.put(createApiUrl(`/api/events/${editingEvent._id}`), formData, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        toast.success('赛事更新成功');
-      }
-
-      setShowEventModal(false);
-      fetchEvents(); // Refresh the list
-    } catch (error) {
-      console.error('保存赛事失败:', error);
-      const errorMessage = error.response?.data?.message || '保存赛事失败';
-      toast.error(errorMessage);
-    } finally {
-      setSaving(false);
-    }
+  // Handle view registrations
+  const handleViewRegistrations = (event) => {
+    navigate(`/coach/events/${event._id}/registrations`);
   };
 
   // Handle delete event
@@ -333,12 +242,23 @@ const Events = () => {
                           <button
                             onClick={() => handleEdit(event)}
                             className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                            title="编辑赛事"
                           >
                             <Edit className="h-4 w-4" />
                           </button>
+                          {event.openRegistration && (
+                            <button
+                              onClick={() => handleViewRegistrations(event)}
+                              className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"
+                              title="查看报名"
+                            >
+                              <Users className="h-4 w-4" />
+                            </button>
+                          )}
                           <button
                             onClick={() => handleDelete(event)}
                             className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                            title="删除赛事"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -353,122 +273,7 @@ const Events = () => {
         )}
       </div>
 
-      {/* Event Modal (Create/Edit) */}
-      {showEventModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {isCreatingNew ? '创建赛事' : '编辑赛事'}
-              </h3>
-              <button
-                onClick={() => setShowEventModal(false)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
 
-            <div className="space-y-4">
-              {/* Event Name */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  赛事名称 *
-                </label>
-                <input
-                  type="text"
-                  value={formData.eventName}
-                  onChange={(e) => setFormData({ ...formData, eventName: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="请输入赛事名称"
-                />
-              </div>
-
-              {/* Organization */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  主办方 *
-                </label>
-                <select
-                  value={formData.organization}
-                  onChange={(e) => setFormData({ ...formData, organization: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">请选择主办方</option>
-                  {organizationOptions.map(org => (
-                    <option key={org} value={org}>{org}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Event Type */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  赛事类型 *
-                </label>
-                <select
-                  value={formData.eventType}
-                  onChange={(e) => setFormData({ ...formData, eventType: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">请选择赛事类型</option>
-                  {eventTypeOptions.map(type => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Start Date */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  开始日期 *
-                </label>
-                <input
-                  type="date"
-                  value={formData.startDate}
-                  onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              {/* End Date */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  结束日期 *
-                </label>
-                <input
-                  type="date"
-                  value={formData.endDate}
-                  onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
-            {/* Modal Actions */}
-            <div className="flex justify-end space-x-3 mt-6">
-              <button
-                onClick={() => setShowEventModal(false)}
-                className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-lg flex items-center space-x-2"
-              >
-                {saving ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                ) : (
-                  <Save className="h-4 w-4" />
-                )}
-                <span>{saving ? '保存中...' : '保存'}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
