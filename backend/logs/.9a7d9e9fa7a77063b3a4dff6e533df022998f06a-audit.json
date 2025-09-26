@@ -79,6 +79,11 @@
             "date": 1758756689571,
             "name": "/Users/alex/dev/orienteering_quiz_app/backend/logs/error-2025-09-25.log",
             "hash": "00e2352970a8290d435dec1dd556495c0c049163832dd9867f125ad87dd6579a"
+        },
+        {
+            "date": 1758852863167,
+            "name": "/Users/alex/dev/orienteering_quiz_app/backend/logs/error-2025-09-26.log",
+            "hash": "75a404600d800af001e804e1642299bc4305d7e1ccb9269948f47d466dcd5308"
         }
     ],
     "hashType": "sha256"

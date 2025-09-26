@@ -204,7 +204,18 @@ const JoinRelayTeam = () => {
             <h4 className="font-medium text-gray-900 mb-2">队伍创建者</h4>
             <div className="flex items-center space-x-3">
               <div className="flex-shrink-0">
-                <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center">
+                {inviteInfo.teamCreator.avatar ? (
+                  <img
+                    src={inviteInfo.teamCreator.avatar}
+                    alt={inviteInfo.teamCreator.name || inviteInfo.teamCreator.username}
+                    className="h-8 w-8 rounded-full object-cover"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.nextSibling.style.display = 'flex';
+                    }}
+                  />
+                ) : null}
+                <div className={`h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center ${inviteInfo.teamCreator.avatar ? 'hidden' : ''}`}>
                   <span className="text-sm font-medium text-white">
                     {inviteInfo.teamCreator.name?.charAt(0) || inviteInfo.teamCreator.username?.charAt(0) || '?'}
                   </span>
@@ -225,7 +236,18 @@ const JoinRelayTeam = () => {
                 {inviteInfo.teamMembers.map((member, index) => (
                   <div key={member._id} className="flex items-center space-x-3">
                     <div className="flex-shrink-0">
-                      <div className="h-6 w-6 rounded-full bg-gray-400 flex items-center justify-center">
+                      {member.avatar ? (
+                        <img
+                          src={member.avatar}
+                          alt={member.name || member.username}
+                          className="h-6 w-6 rounded-full object-cover"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.nextSibling.style.display = 'flex';
+                          }}
+                        />
+                      ) : null}
+                      <div className={`h-6 w-6 rounded-full bg-gray-400 flex items-center justify-center ${member.avatar ? 'hidden' : ''}`}>
                         <span className="text-xs font-medium text-white">
                           {member.name?.charAt(0) || member.username?.charAt(0) || '?'}
                         </span>

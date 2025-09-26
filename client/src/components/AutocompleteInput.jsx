@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from '../config/axiosConfig';
 import { createApiUrl } from '../config/api';
 import { useTheme } from '../context/ThemeContext';
+import Avatar from './Avatar';
 
 const AutocompleteInput = ({ 
   value, 
@@ -152,11 +153,19 @@ const AutocompleteInput = ({
             <div
               key={student._id}
               onClick={() => handleSuggestionClick(student)}
-              className={`px-4 py-2 ${isDarkMode ? 'hover:bg-gray-700 border-gray-600' : 'hover:bg-gray-100 border-gray-100'} cursor-pointer border-b last:border-b-0`}
+              className={`px-4 py-2 ${isDarkMode ? 'hover:bg-gray-700 border-gray-600' : 'hover:bg-gray-100 border-gray-100'} cursor-pointer border-b last:border-b-0 flex items-center space-x-3`}
             >
-              <div className={`font-medium ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>{student.name}</div>
-              <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                {student.grade && student.class ? `${student.grade} - ${student.class}班` : ''}
+              <Avatar 
+                src={student.avatar} 
+                alt={student.name}
+                size="sm"
+                fallbackText={student.name}
+              />
+              <div className="flex-1">
+                <div className={`font-medium ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>{student.name}</div>
+                <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  {student.grade && student.class ? `${student.grade} - ${student.class}班` : ''}
+                </div>
               </div>
             </div>
           ))}

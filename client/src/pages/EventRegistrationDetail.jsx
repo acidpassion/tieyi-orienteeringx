@@ -7,27 +7,35 @@ import { toast } from 'sonner';
 import { ArrowLeft, Users, Clock, MapPin, Calendar, Copy, Check } from 'lucide-react';
 import { createApiUrl } from '../config/api';
 import AutocompleteInput from '../components/AutocompleteInput';
+import Avatar from '../components/Avatar';
+import { useConfirmDialog } from '../hooks/useConfirmDialog';
 
 const EventRegistrationDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { isDarkMode } = useTheme();
+  const confirm = useConfirmDialog();
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [selectedGameTypes, setSelectedGameTypes] = useState([]);
   const [selectedGroups, setSelectedGroups] = useState({});
   const [relayTeams, setRelayTeams] = useState({});
-  const [relayTeamIds, setRelayTeamIds] = useState({}); // 存储队员的_id
+  const [relayTeamIds, setRelayTeamIds] = useState([]);
+  const [relayTeamMembers, setRelayTeamMembers] = useState({}); // Store full student data including avatars
   const [currentUser, setCurrentUser] = useState(null);
   const [userAge, setUserAge] = useState(null);
+  const [existingRegistration, setExistingRegistration] = useState(null);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [urlCopied, setUrlCopied] = useState(false);
 
 
   useEffect(() => {
-    fetchEventDetails();
-    fetchCurrentUser();
+    if (id) {
+      fetchEventDetails();
+      fetchCurrentUser();
+    }
   }, [id]);
 
   useEffect(() => {
@@ -35,6 +43,13 @@ const EventRegistrationDetail = () => {
       fetchUserProfile();
     }
   }, [user]);
+
+  // Only fetch existing registration after event data is loaded
+  useEffect(() => {
+    if (event && id) {
+      fetchExistingRegistration();
+    }
+  }, [event, id]);
 
   const fetchEventDetails = async () => {
     try {
@@ -50,6 +65,12 @@ const EventRegistrationDetail = () => {
   };
 
   const fetchUserProfile = async () => {
+    if (!user || !user._id) {
+      console.warn('用户信息不完整，无法获取档案');
+      setUserAge(null);
+      return;
+    }
+    
     try {
       const response = await axios.get(createApiUrl(`/api/students/${user._id}/profile`));
       const studentData = response.data?.data?.student;
@@ -80,7 +101,132 @@ const EventRegistrationDetail = () => {
       const response = await axios.get(createApiUrl('/api/auth/profile'));
       setCurrentUser(response.data);
     } catch (error) {
-      console.error('获取当前用户信息失败:', error);
+      console.error('Error fetching current user:', error);
+    }
+  };
+
+  const fetchExistingRegistration = async () => {
+    try {
+      // Ensure event data is available before processing
+      if (!event) {
+        console.warn('Event data not available, skipping existing registration fetch');
+        return;
+      }
+      
+      console.log('Fetching existing registrations for event:', id);
+      const response = await axios.get(createApiUrl('/api/registrations/my'));
+      const userRegistrations = response.data;
+      console.log('All user registrations:', userRegistrations);
+      
+      // Validate response data
+      if (!Array.isArray(userRegistrations)) {
+        console.warn('Invalid user registrations data:', userRegistrations);
+        return;
+      }
+      
+      // 查找当前赛事的报名记录
+      const existingReg = userRegistrations.find(reg => 
+        reg && reg.eventId && reg.eventId._id === id
+      );
+      
+      if (existingReg) {
+        console.log('Found existing registration:', existingReg);
+        console.log('Game types in registration:', existingReg.gameTypes);
+        setExistingRegistration(existingReg);
+        setIsEditMode(true);
+        
+        // 预填充表单数据
+        if (existingReg && existingReg.gameTypes && Array.isArray(existingReg.gameTypes) && existingReg.gameTypes.length > 0) {
+          console.log('Processing game types for form population...');
+          const gameTypeSelections = [];
+          const groupSelections = {};
+          const teamData = {};
+          const teamIdData = {};
+          
+          // 过滤掉null值并确保gameTypes数组存在
+          const validGameTypes = existingReg.gameTypes?.filter(gameType => gameType !== null && gameType !== undefined) || [];
+          console.log('Valid game types after filtering:', validGameTypes);
+          
+          validGameTypes.forEach((gt, index) => {
+            console.log(`Processing game type ${index}:`, gt);
+            // Add null check for game type object
+            if (!gt || !gt.name) {
+              console.warn('Invalid game type object found:', gt);
+              return;
+            }
+            
+            console.log(`Adding game type: ${gt.name}`);
+            gameTypeSelections.push(gt.name);
+            if (gt.group) {
+              console.log(`Setting group for ${gt.name}: ${gt.group}`);
+              groupSelections[gt.name] = gt.group;
+            }
+            // Process team data for relay/team games
+            if (gt.name.includes('接力') || gt.name === '团队赛') {
+              // Get team size from event configuration with proper null checks
+              let teamSize = 2; // Default team size
+              
+              if (event && event.gameTypes && Array.isArray(event.gameTypes)) {
+                const gameTypeConfig = event.gameTypes.find(eventGt => {
+                  if (!eventGt) return false;
+                  const eventGtName = typeof eventGt === 'string' ? eventGt : eventGt.name;
+                  return eventGtName === gt.name;
+                });
+                
+                if (gameTypeConfig && typeof gameTypeConfig === 'object' && gameTypeConfig.teamSize) {
+                  teamSize = gameTypeConfig.teamSize;
+                }
+              }
+              
+              console.log(`Team size for ${gt.name}: ${teamSize}`);
+              
+              // Create arrays with full team size, filling existing members first
+              const teamArray = Array(teamSize).fill('');
+              const teamIdArray = Array(teamSize).fill('');
+              const teamMemberArray = Array(teamSize).fill(null);
+              
+              // Fill existing members if they exist
+              if (gt.team && gt.team.members && gt.team.members.length > 0) {
+                gt.team.members.forEach((member, memberIndex) => {
+                  if (memberIndex < teamSize && member !== null && member !== undefined) {
+                    teamArray[memberIndex] = member.realName || member.name || member.username || '';
+                    teamIdArray[memberIndex] = member._id || '';
+                    teamMemberArray[memberIndex] = member;
+                  }
+                });
+              }
+              
+              teamData[gt.name] = teamArray;
+              teamIdData[gt.name] = teamIdArray;
+              // Store full member data for avatar display
+              setRelayTeamMembers(prev => ({
+                ...prev,
+                [gt.name]: teamMemberArray
+              }));
+            }
+          });
+          
+          console.log('Final game type selections:', gameTypeSelections);
+          console.log('Final group selections:', groupSelections);
+          console.log('Final team data:', teamData);
+          console.log('Final team ID data:', teamIdData);
+          
+          setSelectedGameTypes(gameTypeSelections);
+          setSelectedGroups(groupSelections);
+          setRelayTeams(teamData);
+          setRelayTeamIds(teamIdData);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching existing registration:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        eventId: id
+      });
+      // Reset states to prevent UI issues
+      setExistingRegistration(null);
+      setIsEditMode(false);
     }
   };
 
@@ -101,6 +247,11 @@ const EventRegistrationDetail = () => {
         if (currentUser) {
           initialTeams[0] = currentUser.name;
           initialTeamIds[0] = currentUser._id;
+          // Store current user data for avatar display
+          setRelayTeamMembers(prev => ({
+            ...prev,
+            [gameTypeName]: [currentUser, ...Array(teamSize - 1).fill(null)]
+          }));
         }
         
         setRelayTeams(prev => ({
@@ -130,6 +281,12 @@ const EventRegistrationDetail = () => {
         const newTeamIds = { ...prev };
         delete newTeamIds[gameTypeName];
         return newTeamIds;
+      });
+      
+      setRelayTeamMembers(prev => {
+        const newMembers = { ...prev };
+        delete newMembers[gameTypeName];
+        return newMembers;
       });
     }
   };
@@ -169,6 +326,14 @@ const EventRegistrationDetail = () => {
       ...prev,
       [gameTypeName]: prev[gameTypeName].map((id, index) => 
         index === memberIndex ? student._id : id
+      )
+    }));
+    
+    // 更新队员完整数据（包含头像）
+    setRelayTeamMembers(prev => ({
+      ...prev,
+      [gameTypeName]: prev[gameTypeName].map((memberData, index) => 
+        index === memberIndex ? student : memberData
       )
     }));
   };
@@ -235,7 +400,7 @@ const EventRegistrationDetail = () => {
             gameTypeObj.team = {
               name: `${gameTypeName}队伍`, // 可以根据需要调整队伍名称
               members: validMembers.map((memberId, index) => ({
-                $oid: memberId,
+                _id: memberId,
                 runOrder: index + 1
               }))
             };
@@ -250,7 +415,7 @@ const EventRegistrationDetail = () => {
             gameTypeObj.team = {
               name: `${gameTypeName}队伍`, // 可以根据需要调整队伍名称
               members: validMembers.map(memberId => ({
-                $oid: memberId
+                _id: memberId
               }))
             };
           }
@@ -264,9 +429,16 @@ const EventRegistrationDetail = () => {
         gameTypes
       };
 
-      const response = await axios.post(createApiUrl('/api/registrations'), registrationData);
+      let response;
+      if (isEditMode && existingRegistration) {
+        // 编辑模式：更新现有报名记录
+        response = await axios.put(createApiUrl(`/api/registrations/${existingRegistration._id}`), registrationData);
+      } else {
+        // 新建模式：创建新的报名记录
+        response = await axios.post(createApiUrl('/api/registrations'), registrationData);
+      }
       
-      if (response.status === 201) {
+      if (response.status === 201 || response.status === 200) {
         const registrationData = response.data;
         
         // 检查是否有接力赛或团队赛项目，如果有则生成分享链接
@@ -278,7 +450,7 @@ const EventRegistrationDetail = () => {
           // 显示成功消息和分享链接
           toast.success(
             <div>
-              <p>报名成功！</p>
+              <p>{isEditMode ? '报名信息更新成功！' : '报名成功！'}</p>
               <p className="mt-2 text-sm">邀请队友加入：</p>
               <div className={`mt-1 p-2 rounded text-xs break-all ${isDarkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-100 text-gray-800'}`}>
                 {shareUrl}
@@ -296,7 +468,7 @@ const EventRegistrationDetail = () => {
             { duration: 10000 }
           );
         } else {
-          toast.success('报名成功！');
+          toast.success(isEditMode ? '报名信息更新成功！' : '报名成功！');
         }
         
         navigate('/events/register');
@@ -319,6 +491,151 @@ const EventRegistrationDetail = () => {
     } catch (error) {
       console.error('复制失败:', error);
       toast.error('复制失败，请手动复制链接');
+    }
+  };
+
+  const handleQuitTeam = async (gameTypeName) => {
+    if (!currentUser?._id) {
+      toast.error('无法获取用户信息');
+      return;
+    }
+
+    try {
+      // 使用现有的确认对话框组件
+      const confirmed = await confirm({
+        titleCn: '退出团队',
+        messageCn: `确定要退出${gameTypeName}团队吗？退出后需要重新加入。`,
+        confirmTextCn: '确认退出',
+        cancelTextCn: '取消'
+      });
+      
+      if (!confirmed) {
+        return;
+      }
+
+      // 从relayTeamIds中移除当前用户的所有条目
+      const currentTeamMembers = relayTeamIds[gameTypeName] || [];
+      const filteredMembers = currentTeamMembers.filter(memberId => memberId !== currentUser._id);
+      
+      // 构建更新后的gameTypes数据
+      const updatedGameTypes = selectedGameTypes.map(selectedGameType => {
+        const gameTypeObj = {
+          name: selectedGameType,
+          group: selectedGroups[selectedGameType]
+        };
+
+        if (selectedGameType === gameTypeName) {
+          // 为退出的游戏类型更新团队成员
+          if (selectedGameType.includes('接力')) {
+            if (filteredMembers.length > 0) {
+              gameTypeObj.team = {
+                name: `${selectedGameType}队伍`,
+                members: filteredMembers.map((memberId, index) => ({
+                  _id: memberId,
+                  runOrder: index + 1
+                }))
+              };
+            }
+          } else if (selectedGameType === '团队赛') {
+            if (filteredMembers.length > 0) {
+              gameTypeObj.team = {
+                name: `${selectedGameType}队伍`,
+                members: filteredMembers.map(memberId => ({
+                  _id: memberId
+                }))
+              };
+            }
+          }
+        } else {
+          // 为其他游戏类型保持原有团队数据
+          if (selectedGameType.includes('接力') || selectedGameType === '团队赛') {
+            const teamMembers = relayTeamIds[selectedGameType] || [];
+            const validMembers = teamMembers.filter(memberId => memberId && memberId.trim() !== '');
+            if (validMembers.length > 0) {
+              if (selectedGameType.includes('接力')) {
+                gameTypeObj.team = {
+                  name: `${selectedGameType}队伍`,
+                  members: validMembers.map((memberId, index) => ({
+                    _id: memberId,
+                    runOrder: index + 1
+                  }))
+                };
+              } else {
+                gameTypeObj.team = {
+                  name: `${selectedGameType}队伍`,
+                  members: validMembers.map(memberId => ({
+                    _id: memberId
+                  }))
+                };
+              }
+            }
+          }
+        }
+
+        return gameTypeObj;
+      });
+
+      const registrationData = {
+        eventId: id,
+        gameTypes: updatedGameTypes
+      };
+
+      // 调用后端API更新注册数据
+      if (isEditMode && existingRegistration) {
+        await axios.put(createApiUrl(`/api/registrations/${existingRegistration._id}`), registrationData);
+        
+        // 更新本地状态
+        setRelayTeamIds(prev => ({
+          ...prev,
+          [gameTypeName]: filteredMembers
+        }));
+
+        // 更新relayTeams状态（显示的名称）
+        const updatedTeamNames = [];
+        for (let i = 0; i < filteredMembers.length; i++) {
+          const memberId = filteredMembers[i];
+          const memberData = relayTeamMembers[gameTypeName]?.find(m => m._id === memberId);
+          updatedTeamNames[i] = memberData?.name || '';
+        }
+        
+        // 填充空位置
+        const gameTypeConfig = event.gameTypes?.find(gt => (typeof gt === 'string' ? gt : gt.name) === gameTypeName);
+        const maxTeamSize = (typeof gameTypeConfig === 'object' && gameTypeConfig.teamSize) || 2;
+        while (updatedTeamNames.length < maxTeamSize) {
+          updatedTeamNames.push('');
+        }
+
+        setRelayTeams(prev => ({
+          ...prev,
+          [gameTypeName]: updatedTeamNames
+        }));
+
+        // 更新relayTeamMembers状态
+        const updatedMemberData = [];
+        for (let i = 0; i < filteredMembers.length; i++) {
+          const memberId = filteredMembers[i];
+          const memberData = relayTeamMembers[gameTypeName]?.find(m => m._id === memberId);
+          updatedMemberData[i] = memberData || null;
+        }
+        while (updatedMemberData.length < maxTeamSize) {
+          updatedMemberData.push(null);
+        }
+
+        setRelayTeamMembers(prev => ({
+          ...prev,
+          [gameTypeName]: updatedMemberData
+        }));
+
+        // 重新获取最新的注册数据
+        await fetchExistingRegistration();
+        
+        toast.success('已成功退出团队');
+      } else {
+        toast.error('无法退出团队：未找到现有注册记录');
+      }
+    } catch (error) {
+      console.error('退出团队失败:', error);
+      toast.error('退出团队失败，请重试');
     }
   };
 
@@ -399,7 +716,7 @@ const EventRegistrationDetail = () => {
 
         {/* Registration Form */}
         <form onSubmit={handleSubmit} className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-sm p-6`}>
-            <h2 className={`text-xl font-semibold ${isDarkMode ? 'text-gray-100' : 'text-gray-900'} mb-6`}>赛事报名</h2>
+            <h2 className={`text-xl font-semibold ${isDarkMode ? 'text-gray-100' : 'text-gray-900'} mb-6`}>{isEditMode ? '编辑报名信息' : '赛事报名'}</h2>
             
             {/* Game Types Selection */}
             <div className="mb-6">
@@ -453,6 +770,40 @@ const EventRegistrationDetail = () => {
                           {/* Relay Team Members */}
                           {(gameTypeName.includes('接力') || gameTypeName === '团队赛') && (
                             <div>
+                              {/* 检查当前用户是否已在团队中 */}
+                              {(() => {
+                                const currentTeamMembers = relayTeamIds[gameTypeName] || [];
+                                const currentUserId = currentUser?._id;
+                                const userInTeam = currentTeamMembers.includes(currentUserId);
+                                const duplicateCount = currentTeamMembers.filter(id => id === currentUserId).length;
+                                
+                                if (userInTeam && duplicateCount > 1) {
+                                  return (
+                                    <div className={`mb-4 p-3 rounded-lg ${isDarkMode ? 'bg-red-900/20 border border-red-800' : 'bg-red-50 border border-red-200'}`}>
+                                      <div className="flex items-center mb-2">
+                                        <svg className="w-5 h-5 text-red-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                        </svg>
+                                        <span className={`font-medium ${isDarkMode ? 'text-red-400' : 'text-red-800'}`}>
+                                          检测到重复成员
+                                        </span>
+                                      </div>
+                                      <p className={`text-sm ${isDarkMode ? 'text-red-300' : 'text-red-700'} mb-3`}>
+                                        您在此团队中出现了 {duplicateCount} 次。请点击下方按钮退出团队，然后重新加入。
+                                      </p>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleQuitTeam(gameTypeName)}
+                                        className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors"
+                                      >
+                                        退出团队
+                                      </button>
+                                    </div>
+                                  );
+                                }
+                                return null;
+                              })()}
+                              
                               <label className={`block text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
                                 {gameTypeName.includes('接力') ? '接力队员' : '团队成员'} (最多{(() => {
                                   const gameTypeConfig = event.gameTypes?.find(gt => (typeof gt === 'string' ? gt : gt.name) === gameTypeName);
@@ -461,29 +812,49 @@ const EventRegistrationDetail = () => {
                               </label>
                               {(relayTeams[gameTypeName] || []).map((member, memberIndex) => {
                                 const isCaptain = memberIndex === 0; // 第一个是队长
+                                const memberData = relayTeamMembers[gameTypeName]?.[memberIndex];
                                 return (
                                   <div key={memberIndex} className="mb-2">
                                     {isCaptain ? (
-                                      <div className="relative">
-                                        <input
-                                          type="text"
-                                          value={member || ''}
-                                          className={`w-full px-3 py-2 border ${isDarkMode ? 'border-gray-600 bg-gray-600 text-gray-300' : 'border-gray-300 bg-gray-100 text-gray-600'} rounded-md cursor-not-allowed`}
-                                          disabled
-                                          readOnly
+                                      <div className="relative flex items-center space-x-3">
+                                        <Avatar 
+                                          src={memberData?.avatar} 
+                                          alt={memberData?.name || member}
+                                          size="sm"
+                                          fallbackText={memberData?.name || member}
                                         />
-                                        <span className={`absolute right-2 top-1/2 transform -translate-y-1/2 text-xs px-2 py-1 rounded ${isDarkMode ? 'bg-blue-800 text-blue-200' : 'bg-blue-100 text-blue-800'}`}>
-                                          队长
-                                        </span>
+                                        <div className="flex-1 relative">
+                                          <input
+                                            type="text"
+                                            value={member || ''}
+                                            className={`w-full px-3 py-2 border ${isDarkMode ? 'border-gray-600 bg-gray-600 text-gray-300' : 'border-gray-300 bg-gray-100 text-gray-600'} rounded-md cursor-not-allowed`}
+                                            disabled
+                                            readOnly
+                                          />
+                                          <span className={`absolute right-2 top-1/2 transform -translate-y-1/2 text-xs px-2 py-1 rounded ${isDarkMode ? 'bg-blue-800 text-blue-200' : 'bg-blue-100 text-blue-800'}`}>
+                                            队长
+                                          </span>
+                                        </div>
                                       </div>
                                     ) : (
-                                      <AutocompleteInput
-                                        value={member}
-                                        onChange={(value) => handleRelayTeamChange(gameTypeName, memberIndex, value)}
-                                        onSelect={(student) => handleRelayTeamSelect(gameTypeName, memberIndex, student)}
-                                        placeholder={`队员 ${memberIndex + 1} 姓名`}
-                                        className={`w-full px-3 py-2 border ${isDarkMode ? 'border-gray-600 bg-gray-700 text-gray-100' : 'border-gray-300 bg-white text-gray-900'} rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                                      />
+                                      <div className="flex items-center space-x-3">
+                                        <Avatar 
+                                          src={memberData?.avatar} 
+                                          alt={memberData?.name || member}
+                                          size="sm"
+                                          fallbackText={memberData?.name || member || '?'}
+                                          className={!memberData ? 'opacity-50' : ''}
+                                        />
+                                        <div className="flex-1">
+                                          <AutocompleteInput
+                                            value={member}
+                                            onChange={(value) => handleRelayTeamChange(gameTypeName, memberIndex, value)}
+                                            onSelect={(student) => handleRelayTeamSelect(gameTypeName, memberIndex, student)}
+                                            placeholder={`队员 ${memberIndex + 1} 姓名`}
+                                            className={`w-full px-3 py-2 border ${isDarkMode ? 'border-gray-600 bg-gray-700 text-gray-100' : 'border-gray-300 bg-white text-gray-900'} rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                                          />
+                                        </div>
+                                      </div>
                                     )}
                                   </div>
                                 );
@@ -508,7 +879,7 @@ const EventRegistrationDetail = () => {
                 disabled={submitting || !isFormValid()}
                 className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
               >
-                {submitting ? '提交中...' : '确认报名'}
+                {submitting ? '提交中...' : (isEditMode ? '更新报名' : '确认报名')}
               </button>
             </div>
         </form>

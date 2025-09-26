@@ -143,14 +143,30 @@ router.post('/', verifyToken, verifyCoachOrStudent, async (req, res) => {
       return res.status(400).json({ message: '该赛事未开放报名' });
     }
     
-    // Check if user is already registered for this event
+    // Check if user is already registered for this specific game type
     const existingRegistration = await EventRegistration.findOne({
       eventId,
       studentId: req.user._id
     });
     
     if (existingRegistration) {
-      return res.status(409).json({ message: '您已报名该赛事' });
+      // Check if user is already registered for this specific game type
+      const targetGameType = targetRegistration.gameTypes.find(gt => {
+        return gt && gt.inviteCode === inviteCode;
+      });
+      
+      if (!targetGameType) {
+        return res.status(404).json({ message: '无效的邀请码' });
+      }
+      
+      const gameTypeName = targetGameType.name;
+      const alreadyRegisteredForGameType = existingRegistration.gameTypes.some(gt => 
+        gt.name === gameTypeName
+      );
+      
+      if (alreadyRegisteredForGameType) {
+        return res.status(409).json({ message: `您已报名该赛事的${gameTypeName}项目` });
+      }
     }
     
     // Validate game types structure and existence in event
@@ -207,8 +223,8 @@ router.post('/', verifyToken, verifyCoachOrStudent, async (req, res) => {
       console.log('🔍 Processing gameType:', JSON.stringify(gameType, null, 2));
       const transformed = { ...gameType };
       
-      // Transform relay team members
-      if (gameType.team && gameType.team.members) {
+      // Transform relay team members (接力赛)
+      if (gameType.team && gameType.team.members && gameType.name === '接力赛') {
         console.log('🏃 Processing relay team members:', gameType.team.members);
         console.log('🏃 Members type:', typeof gameType.team.members);
         console.log('🏃 Members isArray:', Array.isArray(gameType.team.members));
@@ -229,23 +245,63 @@ router.post('/', verifyToken, verifyCoachOrStudent, async (req, res) => {
           transformed.team = {
             ...gameType.team,
             members: members.map(member => {
-              console.log('👤 Processing member:', member, 'Type:', typeof member);
-              if (member.$oid) {
+              console.log('👤 Processing relay member:', member, 'Type:', typeof member);
+              if (member._id) {
                 const result = {
-                  _id: member.$oid,
+                  _id: new mongoose.Types.ObjectId(member._id),
                   runOrder: member.runOrder
                 };
-                console.log('✅ Transformed member:', result);
+                console.log('✅ Transformed relay member:', result);
+                return result;
+              } else if (member.$oid) {
+                // 向后兼容旧格式
+                const result = {
+                  _id: new mongoose.Types.ObjectId(member.$oid),
+                  runOrder: member.runOrder
+                };
+                console.log('✅ Transformed legacy relay member:', result);
                 return result;
               }
               return member;
             })
           };
         } else {
-          console.error('❌ Members is not an array after parsing:', members);
+          console.error('❌ Relay members is not an array after parsing:', members);
           transformed.team = {
             ...gameType.team,
             members: []
+          };
+        }
+      }
+      
+      // Transform team race members (团队赛)
+      else if (gameType.team && gameType.team.members && gameType.name === '团队赛') {
+        console.log('👥 Processing team race members:', gameType.team.members);
+        
+        let members = gameType.team.members;
+        if (typeof members === 'string') {
+          try {
+            members = JSON.parse(members);
+          } catch (e) {
+            console.error('❌ Failed to parse stringified team members:', e);
+            members = [];
+          }
+        }
+        
+        if (Array.isArray(members)) {
+          transformed.team = {
+            ...gameType.team,
+            members: members.map(member => {
+              console.log('👤 Processing team member:', member, 'Type:', typeof member);
+              if (member._id) {
+                console.log('✅ Transformed team member:', member._id);
+                return { _id: new mongoose.Types.ObjectId(member._id) }; // 团队赛不需要runOrder
+              } else if (member.$oid) {
+                console.log('✅ Transformed legacy team member:', member.$oid);
+                return { _id: new mongoose.Types.ObjectId(member.$oid) }; // 团队赛不需要runOrder
+              }
+              return { _id: new mongoose.Types.ObjectId(member) };
+            })
           };
         }
       }
@@ -274,11 +330,14 @@ router.post('/', verifyToken, verifyCoachOrStudent, async (req, res) => {
             name: `${gameType.name}队伍`, // 默认队伍名称
             members: members.map(member => {
               console.log('👤 Processing legacy team member:', member, 'Type:', typeof member);
-              if (member.$oid) {
+              if (member._id) {
+                console.log('✅ Transformed team member:', member._id);
+                return { _id: new mongoose.Types.ObjectId(member._id) }; // 团队赛不需要runOrder
+              } else if (member.$oid) {
                 console.log('✅ Transformed legacy team member:', member.$oid);
-                return { _id: member.$oid }; // 团队赛不需要runOrder
+                return { _id: new mongoose.Types.ObjectId(member.$oid) }; // 团队赛不需要runOrder
               }
-              return { _id: member };
+              return { _id: new mongoose.Types.ObjectId(member) };
             })
           };
           // 清除旧的members字段
@@ -292,34 +351,7 @@ router.post('/', verifyToken, verifyCoachOrStudent, async (req, res) => {
         }
       }
       
-      // 处理新格式的team结构中的团队赛成员（不包含runOrder）
-      if (gameType.team && gameType.team.members && gameType.name === '团队赛') {
-        console.log('👥 Processing new format team race members:', gameType.team.members);
-        
-        let members = gameType.team.members;
-        if (typeof members === 'string') {
-          try {
-            members = JSON.parse(members);
-          } catch (e) {
-            console.error('❌ Failed to parse stringified team members:', e);
-            members = [];
-          }
-        }
-        
-        if (Array.isArray(members)) {
-          transformed.team = {
-            ...gameType.team,
-            members: members.map(member => {
-              console.log('👤 Processing new format team member:', member, 'Type:', typeof member);
-              if (member.$oid) {
-                console.log('✅ Transformed new format team member:', member.$oid);
-                return { _id: member.$oid }; // 团队赛不需要runOrder
-              }
-              return { _id: member };
-            })
-          };
-        }
-      }
+
       
       console.log('🎯 Final transformed gameType:', JSON.stringify(transformed, null, 2));
       return transformed;
@@ -424,9 +456,49 @@ router.get('/my', verifyToken, verifyCoachOrStudent, async (req, res) => {
     
     logger.logDatabase('Getting user registrations', 'eventRegistrations', filter, {});
     
-    const registrations = await EventRegistration.find(filter)
+    let registrations = await EventRegistration.find(filter)
       .populate('eventId', 'eventName organization startDate endDate location gameTypes groups')
       .sort({ registrationDate: -1 });
+    
+    // Manually populate team members
+    const Student = require('../models/Student');
+    
+    for (let registration of registrations) {
+      if (registration.gameTypes && registration.gameTypes.length > 0) {
+        for (let gameType of registration.gameTypes) {
+          if (gameType.team && gameType.team.members && gameType.team.members.length > 0) {
+            const populatedMembers = [];
+            for (let member of gameType.team.members) {
+              if (member._id) {
+                try {
+                  const studentData = await Student.findById(member._id).select('name avatar grade class username gender birthday');
+                  if (studentData) {
+                    populatedMembers.push({
+                      ...member,
+                      _id: studentData._id,
+                      name: studentData.name || studentData.realName || studentData.username,
+                      realName: studentData.realName || studentData.name,
+                      username: studentData.username,
+                      avatar: studentData.avatar,
+                      grade: studentData.grade,
+                      class: studentData.class
+                    });
+                  } else {
+                    populatedMembers.push(member);
+                  }
+                } catch (err) {
+                  console.error('Error populating team member:', err);
+                  populatedMembers.push(member);
+                }
+              } else {
+                populatedMembers.push(member);
+              }
+            }
+            gameType.team.members = populatedMembers;
+          }
+        }
+      }
+    }
     
     logger.info('User registrations retrieved successfully', {
       requestId,
@@ -476,7 +548,7 @@ router.get('/my', verifyToken, verifyCoachOrStudent, async (req, res) => {
  *       500:
  *         description: Server error
  */
-router.put('/:id', verifyToken, verifyCoach, async (req, res) => {
+router.put('/:id', verifyToken, verifyCoachOrStudent, async (req, res) => {
   const requestId = req.requestId;
   logger.info('HTTP Request', {
     requestId,
@@ -487,11 +559,28 @@ router.put('/:id', verifyToken, verifyCoach, async (req, res) => {
   });
   
   try {
-    const { status, notes } = req.body;
+    // First find the registration to check ownership
+    const existingRegistration = await EventRegistration.findById(req.params.id);
+    
+    if (!existingRegistration) {
+      return res.status(404).json({ message: '报名记录未找到' });
+    }
+    
+    // Check if user can update this registration
+    const isOwner = existingRegistration.studentId.toString() === req.user._id.toString();
+    const isCoach = req.user.role === 'coach' || req.user.role === 'IT';
+    
+    if (!isOwner && !isCoach) {
+      return res.status(403).json({ message: '无权限修改此报名' });
+    }
+    
+    const { status, notes, gameTypes, teamMembers } = req.body;
     
     const updateData = {};
     if (status !== undefined) updateData.status = status;
     if (notes !== undefined) updateData.notes = notes;
+    if (gameTypes !== undefined) updateData.gameTypes = gameTypes;
+    if (teamMembers !== undefined) updateData.teamMembers = teamMembers;
     
     logger.logDatabase('Updating registration', 'eventRegistrations', { _id: req.params.id }, updateData);
     
@@ -650,8 +739,45 @@ router.get('/event/:eventId', verifyToken, verifyCoach, async (req, res) => {
     logger.logDatabase('Getting event registrations', 'eventRegistrations', filter, {});
     
     const registrations = await EventRegistration.find(filter)
-      .populate('studentId', 'username email profile.realName profile.grade profile.school')
+      .populate('studentId', 'name username grade class gender birthday avatar role')
       .sort({ registrationDate: -1 });
+
+    // Manually populate team members for relay teams
+    for (const registration of registrations) {
+      for (const gameType of registration.gameTypes) {
+        if (gameType.team && gameType.team.members && gameType.team.members.length > 0) {
+          const memberIds = gameType.team.members.map(member => member._id || member);
+          const memberDetails = await Student.find({
+            _id: { $in: memberIds }
+          }).select('name username grade avatar');
+          
+          // Create a map for quick lookup
+          const memberMap = {};
+          memberDetails.forEach(member => {
+            memberMap[member._id.toString()] = member;
+          });
+          
+          // Update team members with full details
+          gameType.team.members = gameType.team.members.map(member => {
+            const memberId = member._id || member;
+            const memberDetail = memberMap[memberId.toString()];
+            return {
+              _id: memberId,
+              runOrder: member.runOrder,
+              student: memberDetail || null
+            };
+          });
+        }
+      }
+    }
+
+    // Transform the response to rename studentId to student
+    const transformedRegistrations = registrations.map(reg => {
+      const regObj = reg.toObject({ virtuals: true });
+      regObj.student = regObj.studentId;
+      delete regObj.studentId;
+      return regObj;
+    });
     
     // Get registration statistics
     const stats = {
@@ -678,7 +804,7 @@ router.get('/event/:eventId', verifyToken, verifyCoach, async (req, res) => {
     });
     
     res.json({
-      registrations,
+      registrations: transformedRegistrations,
       stats,
       event: {
         _id: event._id,
@@ -754,7 +880,7 @@ router.get('/event/:eventId/export', verifyToken, verifyCoach, async (req, res) 
     if (status) filter.status = status;
     
     const registrations = await EventRegistration.find(filter)
-      .populate('studentId', 'username email profile.realName profile.grade profile.school profile.phoneNumber')
+      .populate('studentId', 'name username grade class gender birthday avatar')
       .sort({ registrationDate: -1 });
     
     // Create Excel workbook
@@ -763,12 +889,12 @@ router.get('/event/:eventId/export', verifyToken, verifyCoach, async (req, res) 
     
     // Set headers
     worksheet.columns = [
-      { header: '姓名', key: 'realName', width: 15 },
+      { header: '姓名', key: 'name', width: 15 },
       { header: '用户名', key: 'username', width: 15 },
-      { header: '邮箱', key: 'email', width: 25 },
       { header: '年级', key: 'grade', width: 10 },
-      { header: '学校', key: 'school', width: 20 },
-      { header: '电话', key: 'phoneNumber', width: 15 },
+      { header: '班级', key: 'class', width: 10 },
+      { header: '性别', key: 'gender', width: 10 },
+      { header: '生日', key: 'birthday', width: 15 },
       { header: '报名项目', key: 'gameTypes', width: 30 },
       { header: '状态', key: 'status', width: 10 },
       { header: '报名时间', key: 'registrationDate', width: 20 },
@@ -779,12 +905,12 @@ router.get('/event/:eventId/export', verifyToken, verifyCoach, async (req, res) 
     registrations.forEach(registration => {
       const student = registration.studentId;
       worksheet.addRow({
-        realName: student.profile?.realName || '',
-        username: student.username,
-        email: student.email,
-        grade: student.profile?.grade || '',
-        school: student.profile?.school || '',
-        phoneNumber: student.profile?.phoneNumber || '',
+        name: student.name || '',
+        username: student.username || '',
+        grade: student.grade || '',
+        class: student.class || '',
+        gender: student.gender || '',
+        birthday: student.birthday ? student.birthday.toLocaleDateString('zh-CN') : '',
         gameTypes: registration.gameTypes.join(', '),
         status: registration.status === 'pending' ? '待确认' : 
                 registration.status === 'confirmed' ? '已确认' : '已取消',
@@ -877,7 +1003,7 @@ router.post('/invite-info', verifyToken, verifyCoachOrStudent, async (req, res) 
     const targetRegistration = await EventRegistration.findOne({ 
       'gameTypes.inviteCode': inviteCode 
     })
-      .populate('studentId', 'username name grade')
+      .populate('studentId', 'name username grade class gender avatar')
       .populate('eventId', 'eventName organization startDate endDate openRegistration gameTypes gameTypeSettings');
     
     if (!targetRegistration) {
@@ -891,38 +1017,49 @@ router.post('/invite-info', verifyToken, verifyCoachOrStudent, async (req, res) 
       return res.status(400).json({ message: '该赛事未开放报名' });
     }
     
-    // Check if user is already registered for this event
-    const existingRegistration = await EventRegistration.findOne({
-      eventId,
-      studentId: req.user._id
-    });
-    
     // Find the specific game type with the matching invite code
     const targetGameType = targetRegistration.gameTypes.find(gt => {
       return gt && gt.inviteCode === inviteCode;
     });
-    
+
     if (!targetGameType) {
       return res.status(404).json({ message: '无效的邀请码' });
     }
-    
+
     const gameTypeName = targetGameType.name;
-    
+
+    // Check if user is already registered for this specific game type (not just the event)
+    const existingRegistration = await EventRegistration.findOne({
+      eventId,
+      studentId: req.user._id
+    });
+
+    let isAlreadyRegisteredForGameType = false;
+    if (existingRegistration) {
+      // Check if user is already registered for this specific game type
+      isAlreadyRegisteredForGameType = existingRegistration.gameTypes.some(gt => {
+        console.log('Debug - invite-info checking existing gameType:', gt.name, 'vs target:', gameTypeName);
+        return gt && gt.name === gameTypeName;
+      });
+    }
+
+    console.log('Debug - invite-info user already registered for gameType:', isAlreadyRegisteredForGameType);
+
     // Get current team members with populated user info
     const currentMembers = targetGameType.team?.members || [];
     const memberIds = currentMembers.map(member => member._id || member.$oid);
-    
+
     // Populate team member details
     const teamMembers = await Student.find({
       _id: { $in: memberIds }
-    }).select('username name grade');
-    
+    }).select('username name grade avatar');
+
     // Get team size
     const eventGameTypeConfig = event.gameTypes.find(gt => 
       (typeof gt === 'string' ? gt : gt.name) === gameTypeName
     );
     const teamSize = getTeamSizeForGameType(gameTypeName, eventGameTypeConfig, event.gameTypeSettings);
-    
+
     // Format team members with run order for relay games
     const formattedMembers = currentMembers.map(member => {
       const memberInfo = teamMembers.find(tm => tm._id.toString() === (member._id || member.$oid).toString());
@@ -930,7 +1067,8 @@ router.post('/invite-info', verifyToken, verifyCoachOrStudent, async (req, res) 
         _id: member._id || member.$oid,
         username: memberInfo?.username || 'Unknown',
         name: memberInfo?.name || memberInfo?.username || 'Unknown',
-        grade: memberInfo?.grade
+        grade: memberInfo?.grade,
+        avatar: memberInfo?.avatar || ''
       };
       
       if (member.runOrder !== undefined) {
@@ -939,7 +1077,7 @@ router.post('/invite-info', verifyToken, verifyCoachOrStudent, async (req, res) 
       
       return result;
     });
-    
+
     const inviteInfo = {
       event: {
         _id: event._id,
@@ -957,11 +1095,12 @@ router.post('/invite-info', verifyToken, verifyCoachOrStudent, async (req, res) 
         _id: targetRegistration.studentId._id,
         username: targetRegistration.studentId.username,
         name: targetRegistration.studentId.name || targetRegistration.studentId.username,
-        grade: targetRegistration.studentId.grade
+        grade: targetRegistration.studentId.grade,
+        avatar: targetRegistration.studentId.avatar || ''
       },
       teamMembers: formattedMembers,
       isTeamFull: currentMembers.length >= teamSize,
-      userStatus: existingRegistration ? 'already_registered' : 'can_join'
+      userStatus: isAlreadyRegisteredForGameType ? 'already_registered' : 'can_join'
     };
     
     logger.info('Retrieved invite code information', {
@@ -1028,6 +1167,10 @@ router.post('/join-relay', verifyToken, verifyCoachOrStudent, async (req, res) =
   try {
     const { inviteCode } = req.body;
     
+    console.log('=== JOIN RELAY DEBUG START ===');
+    console.log('Debug - Invite code received:', inviteCode);
+    console.log('Debug - User ID:', req.user._id);
+    
     // Validate required fields
     if (!inviteCode) {
       return res.status(400).json({ message: '邀请码是必需的' });
@@ -1037,8 +1180,14 @@ router.post('/join-relay', verifyToken, verifyCoachOrStudent, async (req, res) =
     const targetRegistration = await EventRegistration.findOne({ 
       'gameTypes.inviteCode': inviteCode 
     })
-      .populate('studentId', 'username name')
+      .populate('studentId', 'username name avatar')
       .populate('eventId', 'eventName organization startDate endDate openRegistration gameTypes gameTypeSettings');
+    
+    console.log('Debug - Target registration found:', !!targetRegistration);
+    if (targetRegistration) {
+      console.log('Debug - Target registration ID:', targetRegistration._id);
+      console.log('Debug - Target registration gameTypes count:', targetRegistration.gameTypes.length);
+    }
     
     if (!targetRegistration) {
       return res.status(404).json({ message: '无效的邀请码' });
@@ -1047,37 +1196,71 @@ router.post('/join-relay', verifyToken, verifyCoachOrStudent, async (req, res) =
     const event = targetRegistration.eventId;
     const eventId = event._id;
     
+    console.log('Debug - Event ID:', eventId);
+    console.log('Debug - Event name:', event.eventName);
+    
     if (!event.openRegistration) {
       return res.status(400).json({ message: '该赛事未开放报名' });
     }
     
-    // Check if user is already registered for this event
+    // Check if user is already registered for this specific gameType
     const existingRegistration = await EventRegistration.findOne({
       eventId,
       studentId: req.user._id
     });
     
+    console.log('Debug - Existing registration found:', !!existingRegistration);
     if (existingRegistration) {
-      return res.status(409).json({ message: '您已报名该赛事' });
+      console.log('Debug - Existing registration ID:', existingRegistration._id);
+      console.log('Debug - Existing registration gameTypes:', existingRegistration.gameTypes.map(gt => ({
+        name: gt.name,
+        inviteCode: gt.inviteCode
+      })));
     }
     
-    // Debug: Log the structure of gameTypes
-    // Find the specific game type with the matching invite code
+    // Find the specific game type with the matching invite code first
     const targetGameType = targetRegistration.gameTypes.find(gt => {
       return gt && gt.inviteCode === inviteCode;
     });
     
+    console.log('Debug - Target game type found:', !!targetGameType);
+    if (targetGameType) {
+      console.log('Debug - Target game type name:', targetGameType.name);
+      console.log('Debug - Target game type invite code:', targetGameType.inviteCode);
+    }
+    
     if (!targetGameType) {
       return res.status(404).json({ message: '无效的邀请码' });
     }
+    
+    const gameTypeName = targetGameType.name;
+    console.log('Debug - Game type name to check:', gameTypeName);
+    
+    if (existingRegistration) {
+      console.log('Debug - Checking if already registered for game type:', gameTypeName);
+      
+      // Check if user is already registered for this specific game type
+      const alreadyRegisteredForGameType = existingRegistration.gameTypes.some(gt => {
+        console.log('Debug - Comparing existing game type:', gt.name, 'with target:', gameTypeName);
+        return gt.name === gameTypeName;
+      });
+      
+      console.log('Debug - Already registered for this game type:', alreadyRegisteredForGameType);
+      
+      if (alreadyRegisteredForGameType) {
+        console.log('Debug - Blocking registration - already registered for:', gameTypeName);
+        console.log('=== JOIN RELAY DEBUG END ===');
+        return res.status(409).json({ message: `您已报名该赛事的${gameTypeName}项目` });
+      }
+    }
+    
+    console.log('Debug - Proceeding with registration for game type:', gameTypeName);
     
     // Add validation for targetGameType structure
     if (typeof targetGameType !== 'object' || !targetGameType.name) {
       console.error('Debug - Invalid targetGameType structure:', targetGameType);
       return res.status(400).json({ message: '游戏类型数据结构异常' });
     }
-    
-    const gameTypeName = targetGameType.name;
     
     // Verify it's a relay or team game type
     if (!gameTypeName.includes('接力') && !gameTypeName.includes('团队')) {
@@ -1132,8 +1315,8 @@ router.post('/join-relay', verifyToken, verifyCoachOrStudent, async (req, res) =
     // Create gameTypes for the new user (copy the specific game type with updated team info)
     const updatedTargetGameType = updatedGameTypes.find(gt => gt && gt.inviteCode === inviteCode);
     
-    // Create properly formatted gameTypes for the new user
-    const newUserGameTypes = [{
+    // Create properly formatted gameType for the user
+    const newUserGameType = {
       ...updatedTargetGameType,
       team: {
         ...updatedTargetGameType.team,
@@ -1152,44 +1335,60 @@ router.post('/join-relay', verifyToken, verifyCoachOrStudent, async (req, res) =
           return result;
         })
       }
-    }];
+    };
     
-    // Create new registration for the joining user
-    const newRegistration = new EventRegistration({
-      eventId,
-      studentId: req.user._id,
-      gameTypes: newUserGameTypes,
-      status: 'pending',
-      notes: `通过分享链接加入 ${targetRegistration.studentId.profile?.realName || targetRegistration.studentId.username} 的队伍`
-    });
+    let userRegistration;
+    
+    if (existingRegistration) {
+      // User already has a registration for this event, add the new game type
+      existingRegistration.gameTypes.push(newUserGameType);
+      userRegistration = existingRegistration;
+      
+      // Update notes to include the new team join
+      const existingNotes = existingRegistration.notes || '';
+      const newNote = `通过分享链接加入 ${targetRegistration.studentId.username} 的${gameTypeName}队伍`;
+      existingRegistration.notes = existingNotes ? `${existingNotes}; ${newNote}` : newNote;
+    } else {
+      // Create new registration for the joining user
+      userRegistration = new EventRegistration({
+        eventId,
+        studentId: req.user._id,
+        gameTypes: [newUserGameType],
+        status: 'pending',
+        notes: `通过分享链接加入 ${targetRegistration.studentId.username} 的${gameTypeName}队伍`
+      });
+    }
     
     // Update target registration with new team member
     targetRegistration.gameTypes = updatedGameTypes;
     
     // Save both registrations
     await Promise.all([
-      newRegistration.save(),
+      userRegistration.save(),
       targetRegistration.save()
     ]);
     
-    // Populate the new registration
-    await newRegistration.populate('eventId', 'eventName organization startDate endDate');
-    await newRegistration.populate('studentId', 'username email profile.realName profile.grade');
+    // Populate the user registration
+    await userRegistration.populate('eventId', 'eventName organization startDate endDate');
+    await userRegistration.populate('studentId', 'username email profile.realName profile.grade');
     
     logger.info('Successfully joined relay team', {
       requestId,
-      newRegistrationId: newRegistration._id,
+      userRegistrationId: userRegistration._id,
       targetRegistrationId: targetRegistration._id,
       inviteCode,
       eventId,
       userId: req.user._id,
       gameTypeName: gameTypeName,
-      inviteCode
+      existingRegistration: !!existingRegistration
     });
     
+    console.log('Debug - Successfully joined relay team for game type:', gameTypeName);
+    console.log('=== JOIN RELAY DEBUG END ===');
+    
     res.status(200).json({
-      message: '成功加入接力队伍',
-      registration: newRegistration
+      message: `成功加入${gameTypeName}队伍`,
+      registration: userRegistration
     });
   } catch (error) {
     logger.logError(error, req);

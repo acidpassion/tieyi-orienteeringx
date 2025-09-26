@@ -1082,7 +1082,7 @@ const UserProfile = () => {
                         <div className="flex-1">
                           <div className="flex items-center space-x-2 mb-2">
                             <h4 className="text-lg font-medium text-gray-900 dark:text-white">
-                              {registration.event?.eventName || '未知赛事'}
+                              {registration.eventId?.eventName || registration.event?.eventName || '未知赛事'}
                             </h4>
                             <div className="flex items-center space-x-1">
                               {getStatusIcon(registration.status)}
@@ -1099,11 +1099,17 @@ const UserProfile = () => {
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600 dark:text-gray-400">
                             <div className="flex items-center space-x-2">
                               <Calendar className="h-4 w-4" />
-                              <span>赛事时间: {formatDate(registration.event?.startDate)} - {formatDate(registration.event?.endDate)}</span>
+                              <span>赛事时间: {
+                                (registration.eventId?.startDate || registration.event?.startDate) && (registration.eventId?.endDate || registration.event?.endDate)
+                                  ? `${formatDate(registration.eventId?.startDate || registration.event?.startDate)} - ${formatDate(registration.eventId?.endDate || registration.event?.endDate)}`
+                                  : (registration.eventId?.startDate || registration.event?.startDate)
+                                    ? formatDate(registration.eventId?.startDate || registration.event?.startDate)
+                                    : '待定'
+                              }</span>
                             </div>
                             <div className="flex items-center space-x-2">
                               <MapPin className="h-4 w-4" />
-                              <span>地点: {registration.event?.location || '待定'}</span>
+                              <span>地点: {registration.eventId?.location || registration.event?.location || '待定'}</span>
                             </div>
                             <div className="flex items-center space-x-2">
                               <Trophy className="h-4 w-4" />
@@ -1131,6 +1137,21 @@ const UserProfile = () => {
                         </div>
                         
                         <div className="flex flex-col space-y-2 ml-4">
+                          <button
+                            onClick={() => {
+                              const eventId = registration.eventId?._id || registration.event?._id;
+                              if (eventId) {
+                                window.location.href = `/events/register/${eventId}`;
+                              } else {
+                                toast.error('无法获取赛事ID，请刷新页面重试');
+                              }
+                            }}
+                            className="flex items-center space-x-1 px-3 py-1 text-sm text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 border border-green-300 hover:border-green-400 rounded transition-colors"
+                            title="编辑报名信息"
+                          >
+                            <Edit className="h-3 w-3" />
+                            <span>编辑</span>
+                          </button>
                           {getShareableGameTypes(registration).map((gameType, index) => {
                             const gameTypeName = typeof gameType === 'string' ? gameType : gameType.name;
                             return (

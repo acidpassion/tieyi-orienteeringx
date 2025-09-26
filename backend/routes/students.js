@@ -102,6 +102,8 @@ const generateDefaultPassword = (name) => {
  *                     type: string
  *                   class:
  *                     type: number
+ *                   avatar:
+ *                     type: string
  */
 router.get('/search', verifyToken, async (req, res) => {
   try {
@@ -114,7 +116,7 @@ router.get('/search', verifyToken, async (req, res) => {
     const searchRegex = new RegExp(name.trim(), 'i'); // Case insensitive search
     const students = await Student.find(
       { name: searchRegex },
-      { _id: 1, name: 1, grade: 1, class: 1 } // Only return necessary fields
+      { _id: 1, name: 1, grade: 1, class: 1, avatar: 1 } // Include avatar field
     )
     .limit(parseInt(limit))
     .sort({ name: 1 }); // Sort alphabetically

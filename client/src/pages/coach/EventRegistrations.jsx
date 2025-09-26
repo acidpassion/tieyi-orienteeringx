@@ -24,7 +24,6 @@ const EventRegistrations = () => {
   useEffect(() => {
     fetchEventData();
     fetchRegistrations();
-    fetchRelayTeams();
   }, [eventId]);
 
   const fetchEventData = async () => {
@@ -46,27 +45,82 @@ const EventRegistrations = () => {
       const response = await axios.get(createApiUrl(`/api/registrations/event/${eventId}`), {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setRegistrations(response.data.registrations || []);
+      const registrations = response.data.registrations || [];
+      setRegistrations(registrations);
       setStats(response.data.stats || { total: 0, confirmed: 0, pending: 0, cancelled: 0 });
+      
+      // Extract relay teams from registrations
+      const relayTeamsData = [];
+      registrations.forEach(registration => {
+        if (registration.gameTypes && Array.isArray(registration.gameTypes)) {
+          registration.gameTypes.forEach(gameType => {
+            if ((gameType.name === '接力赛' || gameType.name?.includes('接力')) && gameType.team && gameType.team.members && gameType.team.members.length > 0) {
+              console.log('Debug - Relay team gameType:', gameType);
+              console.log('Debug - Team members:', gameType.team.members);
+              
+              relayTeamsData.push({
+                _id: gameType._id || `${registration._id}_${gameType.name}`,
+                teamName: gameType.team.name || '未命名团队',
+                gameType: gameType.name,
+                group: gameType.group,
+                members: gameType.team.members.map((member, index) => {
+                  console.log(`Debug - Processing member ${index}:`, member);
+                  
+                  // Check if member is just an ID string or has student data
+                  let studentData = null;
+                  let memberId = null;
+                  
+                  if (typeof member === 'string') {
+                    // Member is just an ID
+                    memberId = member;
+                    // Try to find student data from registrations
+                    const studentReg = registrations.find(reg => reg.student?._id === member);
+                    studentData = studentReg?.student;
+                  } else if (member._id) {
+                    // Member is an object with _id
+                    memberId = member._id;
+                    studentData = member.student || member;
+                    
+                    // If no student data, try to find from registrations
+                    if (!studentData?.name) {
+                      const studentReg = registrations.find(reg => reg.student?._id === memberId);
+                      studentData = studentReg?.student;
+                    }
+                  }
+                  
+                  console.log(`Debug - Member ${index} processed:`, {
+                    memberId,
+                    studentData,
+                    hasName: !!studentData?.name,
+                    hasAvatar: !!studentData?.avatar
+                  });
+                  
+                  return {
+                    _id: memberId,
+                    student: studentData,
+                    name: studentData?.name || '未知成员',
+                    runOrder: member.runOrder || (index + 1)
+                  };
+                }),
+                inviteCode: gameType.inviteCode,
+                isFull: gameType.team.members.length >= 3,
+                createdAt: registration.createdAt,
+                status: registration.status
+              });
+            }
+          });
+        }
+      });
+      setRelayTeams(relayTeamsData);
     } catch (error) {
       console.error('获取报名信息失败:', error);
       toast.error('获取报名信息失败');
-    }
-  };
-
-  const fetchRelayTeams = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(createApiUrl(`/api/relay-teams/event/${eventId}`), {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setRelayTeams(response.data || []);
-    } catch (error) {
-      console.error('获取接力团队信息失败:', error);
     } finally {
       setLoading(false);
     }
   };
+
+
 
   const handleExportExcel = async () => {
     try {
@@ -260,12 +314,36 @@ const EventRegistrations = () => {
                   <tr key={registration._id}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div>
+                        <div className="flex-shrink-0 h-10 w-10">
+                          {registration.student?.avatar && registration.student.avatar.startsWith('data:image') ? (
+                            <img
+                              className="h-10 w-10 rounded-full object-cover"
+                              src={registration.student.avatar}
+                              alt={registration.student.name || '学生头像'}
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                                e.target.nextSibling.style.display = 'flex';
+                              }}
+                            />
+                          ) : (
+                            <div className="h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
+                              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                {registration.student?.name?.charAt(0) || '?'}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="ml-4">
                           <div className="text-sm font-medium text-gray-900 dark:text-white">
                             {registration.student?.name || '未知学生'}
                           </div>
                           <div className="text-sm text-gray-500 dark:text-gray-400">
-                            {registration.student?.email}
+                            {registration.student?.grade && registration.student?.class && (
+                              `${registration.student.grade}${registration.student.class}班`
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-400 dark:text-gray-500">
+                            {registration.student?.gender} · {registration.student?.age}岁
                           </div>
                         </div>
                       </div>
@@ -335,14 +413,43 @@ const EventRegistrations = () => {
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm text-gray-900 dark:text-white">
-                        {team.members.map((member, index) => (
-                          <div key={index} className="flex items-center space-x-2">
-                            <span>{member.name}</span>
-                            <span className="text-xs text-gray-500 dark:text-gray-400">
-                              ({member.role})
-                            </span>
-                          </div>
-                        ))}
+                        {team.members && team.members.length > 0 ? (
+                          team.members.map((member, index) => (
+                            <div key={member._id || index} className="flex items-center space-x-3 mb-2">
+                              <div className="flex-shrink-0 h-8 w-8">
+                                {member.student?.avatar && member.student.avatar.startsWith('data:image') ? (
+                                  <img
+                                    className="h-8 w-8 rounded-full object-cover"
+                                    src={member.student.avatar}
+                                    alt={member.student.name || '成员头像'}
+                                    onError={(e) => {
+                                      e.target.style.display = 'none';
+                                      e.target.nextSibling.style.display = 'flex';
+                                    }}
+                                  />
+                                ) : (
+                                  <div className="h-8 w-8 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
+                                    <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                                      {member.student?.name?.charAt(0) || member.name?.charAt(0) || '?'}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                              <div>
+                                <div className="font-medium">
+                                  {member.student?.name || member.name || '未知成员'}
+                                </div>
+                                {member.runOrder && (
+                                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                                    第{member.runOrder}棒
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <span className="text-gray-400">暂无成员</span>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

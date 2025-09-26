@@ -80,19 +80,55 @@ const eventRegistrationSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// 添加自定义验证器来验证gameTypes中的team.members
+// Pre-save middleware to normalize team member data format
+eventRegistrationSchema.pre('save', function(next) {
+  if (this.gameTypes) {
+    this.gameTypes.forEach(gameType => {
+      if (gameType.team && gameType.team.members) {
+        gameType.team.members.forEach(member => {
+          // Convert $oid to _id if present
+          if (member.$oid && !member._id) {
+            member._id = member.$oid;
+            delete member.$oid;
+          }
+        });
+      }
+    });
+  }
+  next();
+});
+
+// Pre-update middleware to normalize team member data format
+eventRegistrationSchema.pre(['findOneAndUpdate', 'updateOne', 'updateMany'], function(next) {
+  const update = this.getUpdate();
+  if (update.gameTypes) {
+    update.gameTypes.forEach(gameType => {
+      if (gameType.team && gameType.team.members) {
+        gameType.team.members.forEach(member => {
+          // Convert $oid to _id if present
+          if (member.$oid && !member._id) {
+            member._id = member.$oid;
+            delete member.$oid;
+          }
+        });
+      }
+    });
+  }
+  next();
+});
+
+// Custom validator for team members based on game type
 eventRegistrationSchema.path('gameTypes').validate(function(gameTypes) {
   for (const gameType of gameTypes) {
     if (gameType.team && gameType.team.members) {
       for (const member of gameType.team.members) {
-        // 如果是接力赛，必须有runOrder字段
         if (gameType.name === '接力赛') {
-          if (!member._id || typeof member.runOrder !== 'number' || member.runOrder < 1) {
+          // 接力赛需要 _id 和 runOrder
+          if (!member._id || member.runOrder === undefined) {
             return false;
           }
-        }
-        // 如果是团队赛，不应该有runOrder字段
-        else if (gameType.name === '团队赛') {
+        } else if (gameType.name === '团队赛') {
+          // 团队赛只需要 _id，不需要 runOrder
           if (!member._id || member.runOrder !== undefined) {
             return false;
           }
