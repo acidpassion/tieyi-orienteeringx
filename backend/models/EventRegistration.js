@@ -4,7 +4,7 @@ const crypto = require('crypto');
 // 全局计数器，用于生成唯一邀请码
 let inviteCodeCounter = 0;
 
-// 接力赛成员schema（包含runOrder）
+// 接力赛成员schema（包含runOrder和captain）
 const relayMemberSchema = new mongoose.Schema({
   _id: {
     type: mongoose.Schema.Types.ObjectId,
@@ -15,15 +15,23 @@ const relayMemberSchema = new mongoose.Schema({
     type: Number,
     min: 1,
     required: true
+  },
+  captain: {
+    type: Boolean,
+    default: false
   }
 });
 
-// 团队赛成员schema（不包含runOrder）
+// 团队赛成员schema（不包含runOrder，但包含captain）
 const teamMemberSchema = new mongoose.Schema({
   _id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Student',
     required: true
+  },
+  captain: {
+    type: Boolean,
+    default: false
   }
 });
 
@@ -39,6 +47,7 @@ const eventRegistrationSchema = new mongoose.Schema({
     required: true
   },
   gameTypes: [{
+    _id: false, // Disable automatic _id generation for gameTypes
     name: {
       type: String,
       required: true,
@@ -55,9 +64,22 @@ const eventRegistrationSchema = new mongoose.Schema({
         type: String,
         trim: true
       },
-      // 使用Mixed类型支持两种成员格式
+      // 明确定义成员字段结构，确保captain字段被保留
       members: [{
-        type: mongoose.Schema.Types.Mixed
+        _id: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'Student',
+          required: true
+        },
+        runOrder: {
+          type: Number,
+          min: 1
+          // 接力赛需要，团队赛可选
+        },
+        captain: {
+          type: Boolean,
+          default: false
+        }
       }]
     },
     // 邀请码，仅用于接力赛和团队赛
@@ -119,25 +141,54 @@ eventRegistrationSchema.pre(['findOneAndUpdate', 'updateOne', 'updateMany'], fun
 
 // Custom validator for team members based on game type
 eventRegistrationSchema.path('gameTypes').validate(function(gameTypes) {
+  console.log('🔍 Validating gameTypes:', JSON.stringify(gameTypes, null, 2));
+  
   for (const gameType of gameTypes) {
-    if (gameType.team && gameType.team.members) {
+    console.log(`🎯 Checking gameType: ${gameType.name}`);
+    
+    if (gameType.team && gameType.team.members && gameType.team.members.length > 0) {
+      console.log(`  📋 Has team with ${gameType.team.members.length} members`);
+      let captainCount = 0;
+      
       for (const member of gameType.team.members) {
+        console.log(`  👤 Member: _id=${member._id}, runOrder=${member.runOrder}, captain=${member.captain}`);
+        
         if (gameType.name === '接力赛') {
           // 接力赛需要 _id 和 runOrder
           if (!member._id || member.runOrder === undefined) {
+            console.log(`  ❌ Relay race validation failed: missing _id or runOrder`);
             return false;
           }
         } else if (gameType.name === '团队赛') {
           // 团队赛只需要 _id，不需要 runOrder
           if (!member._id || member.runOrder !== undefined) {
+            console.log(`  ❌ Team race validation failed: missing _id or has runOrder`);
             return false;
           }
         }
+        
+        // 统计队长数量
+        if (member.captain === true) {
+          captainCount++;
+        }
       }
+      
+      console.log(`  👑 Captain count: ${captainCount}`);
+      // 确保每个团队只有一个队长
+      if (captainCount !== 1) {
+        console.log(`  ❌ Invalid captain count: ${captainCount}`);
+        return false;
+      }
+      
+      console.log(`  ✅ GameType ${gameType.name} validation passed`);
+    } else {
+      console.log(`  ✅ Individual gameType (no team validation needed)`);
     }
   }
+  
+  console.log('✅ All gameTypes validation passed');
   return true;
-}, 'Invalid team members format for game type');
+}, 'Invalid team members format for game type or invalid captain count');
 
 // 复合唯一索引，确保每个学生在每个赛事中只能有一条报名记录
 eventRegistrationSchema.index({ eventId: 1, studentId: 1 }, { unique: true });
@@ -204,6 +255,8 @@ eventRegistrationSchema.statics.generateInviteCodesForRelayGames = async functio
   
   return gameTypes;
 };
+
+
 
 
 

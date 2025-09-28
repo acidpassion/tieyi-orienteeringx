@@ -19,7 +19,8 @@ import {
   Shield,
   BookOpen,
   Calendar,
-  TrendingUp
+  TrendingUp,
+  Settings
 } from 'lucide-react';
 
 const Layout = ({ children }) => {
@@ -41,12 +42,14 @@ const Layout = ({ children }) => {
     { name: '作业管理', href: '/coach/assignments', icon: ClipboardList },
     { name: '赛事管理', href: '/coach/events', icon: Calendar },
     { name: '赛事出勤', href: '/coach/performance-management', icon: TrendingUp },
+    { name: '系统配置', href: '/admin/configurations', icon: Settings },
   ] : user?.role === 'it' ? [
     { name: '仪表板', href: '/it/dashboard', icon: Home },
     { name: '学生管理', href: '/it/students', icon: Users },
     { name: '学生花名册', href: '/it/roster', icon: UserCheck },
     { name: '作业管理', href: '/it/assignments', icon: ClipboardList },
     { name: '赛事管理', href: '/it/events', icon: Calendar },
+    { name: '系统配置', href: '/admin/configurations', icon: Settings },
   ] : [
     { name: '仪表板', href: '/dashboard', icon: Home },
     { name: '历史记录', href: '/history', icon: History },

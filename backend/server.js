@@ -18,6 +18,7 @@ const completionRecordRoutes = require('./routes/completionRecords');
 const eventRoutes = require('./routes/events');
 const registrationRoutes = require('./routes/registrations');
 const relayTeamRoutes = require('./routes/relayTeams');
+const configurationRoutes = require('./routes/configurations');
 
 const app = express();
 
@@ -50,6 +51,7 @@ app.use('/api/completion-records', completionRecordRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/registrations', registrationRoutes);
 app.use('/api/relay-teams', relayTeamRoutes);
+app.use('/api/configurations', configurationRoutes);
 
 // 404 handler
 app.use('*', handle404);

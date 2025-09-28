@@ -105,9 +105,76 @@ const generateDefaultPassword = (name) => {
  *                   avatar:
  *                     type: string
  */
+// Check team conflicts for multiple students
+router.post('/check-team-conflicts', verifyToken, async (req, res) => {
+  try {
+    const { studentIds, eventId } = req.body;
+    
+    if (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0) {
+      return res.status(400).json({ error: 'Student IDs array is required' });
+    }
+    
+    if (!eventId) {
+      return res.status(400).json({ error: 'Event ID is required' });
+    }
+    
+    const EventRegistration = require('../models/EventRegistration');
+    
+    const conflicts = [];
+    
+    for (const studentId of studentIds) {
+      try {
+        const existingRegistration = await EventRegistration.findOne({
+          studentId: studentId,
+          eventId: eventId
+        }).populate('studentId', 'name grade class');
+        
+        if (existingRegistration) {
+          const relayGameType = existingRegistration.gameTypes.find(gt => gt.name === '接力赛');
+          if (relayGameType && relayGameType.team && relayGameType.team.length > 0) {
+            conflicts.push({
+              studentId: studentId,
+              studentName: existingRegistration.studentId.name,
+              conflictType: 'already_in_team',
+              teamId: existingRegistration._id,
+              teamMembers: relayGameType.team.length,
+              message: `${existingRegistration.studentId.name} 已经加入了其他接力团队`
+            });
+          } else if (existingRegistration.gameTypes.length > 0) {
+            conflicts.push({
+              studentId: studentId,
+              studentName: existingRegistration.studentId.name,
+              conflictType: 'already_registered',
+              registrationId: existingRegistration._id,
+              gameTypes: existingRegistration.gameTypes.map(gt => gt.name),
+              message: `${existingRegistration.studentId.name} 已经注册了其他游戏类型`
+            });
+          }
+        }
+      } catch (error) {
+        logger.error(`Error checking conflict for student ${studentId}:`, error);
+        conflicts.push({
+          studentId: studentId,
+          conflictType: 'check_error',
+          message: '检查团队冲突时发生错误'
+        });
+      }
+    }
+    
+    logger.info(`Team conflict check completed for ${studentIds.length} students, found ${conflicts.length} conflicts`);
+    res.json({
+      hasConflicts: conflicts.length > 0,
+      conflicts: conflicts
+    });
+  } catch (error) {
+    logger.error('Error checking team conflicts:', error);
+    res.status(500).json({ error: 'Failed to check team conflicts' });
+  }
+});
+
 router.get('/search', verifyToken, async (req, res) => {
   try {
-    const { name, limit = 10 } = req.query;
+    const { name, limit = 10, eventId } = req.query;
     
     if (!name || name.trim() === '') {
       return res.status(400).json({ error: 'Search name is required' });
@@ -121,8 +188,56 @@ router.get('/search', verifyToken, async (req, res) => {
     .limit(parseInt(limit))
     .sort({ name: 1 }); // Sort alphabetically
     
-    logger.info(`Student search completed for term: ${name}, found ${students.length} results`);
-    res.json(students);
+    // If eventId is provided, check team status for each student
+    if (eventId) {
+      const EventRegistration = require('../models/EventRegistration');
+      
+      const studentsWithStatus = await Promise.all(students.map(async (student) => {
+        try {
+          // Check if student is already registered for this event
+          const existingRegistration = await EventRegistration.findOne({
+            studentId: student._id,
+            eventId: eventId
+          });
+          
+          let teamStatus = 'available';
+          let conflictInfo = null;
+          
+          if (existingRegistration) {
+            // Check if student is already in a relay team
+            const relayGameType = existingRegistration.gameTypes.find(gt => gt.name === '接力赛');
+            if (relayGameType && relayGameType.team && relayGameType.team.length > 0) {
+              teamStatus = 'in_team';
+              conflictInfo = {
+                teamId: existingRegistration._id,
+                teamMembers: relayGameType.team.length
+              };
+            } else if (existingRegistration.gameTypes.length > 0) {
+              teamStatus = 'registered';
+            }
+          }
+          
+          return {
+            ...student.toObject(),
+            teamStatus,
+            conflictInfo
+          };
+        } catch (error) {
+          logger.error(`Error checking team status for student ${student._id}:`, error);
+          return {
+            ...student.toObject(),
+            teamStatus: 'available',
+            conflictInfo: null
+          };
+        }
+      }));
+      
+      logger.info(`Student search with team status completed for term: ${name}, found ${studentsWithStatus.length} results`);
+      res.json(studentsWithStatus);
+    } else {
+      logger.info(`Student search completed for term: ${name}, found ${students.length} results`);
+      res.json(students);
+    }
   } catch (error) {
     logger.error('Error searching students:', error);
     res.status(500).json({ error: 'Failed to search students' });

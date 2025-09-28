@@ -9,8 +9,15 @@ import statics from '../../assets/statics.json';
 const EventEdit = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const isCreating = id === 'new';
+  const isCreating = !id || id === 'new';
   const [loading, setLoading] = useState(!isCreating);
+  
+  // Debug logging
+  console.log('EventEdit Debug:', {
+    id,
+    isCreating,
+    initialLoading: !isCreating
+  });
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('basic');
 
@@ -38,13 +45,31 @@ const EventEdit = () => {
 
   // Fetch event data if editing
   useEffect(() => {
-    if (!isCreating) {
+    console.log('useEffect triggered:', {
+      isCreating,
+      id,
+      shouldFetch: !isCreating && id && id !== 'new'
+    });
+    
+    if (!isCreating && id && id !== 'new') {
+      console.log('Calling fetchEvent...');
       fetchEvent();
+    } else {
+      console.log('Skipping fetchEvent - creating new event');
+      // Ensure loading is false for new events
+      setLoading(false);
     }
   }, [id, isCreating]);
 
   const fetchEvent = async () => {
+    console.log('fetchEvent called:', { isCreating, id });
+    if (isCreating) {
+      console.log('fetchEvent: Early return - isCreating is true');
+      return;
+    }
+    
     try {
+      console.log('fetchEvent: Setting loading to true');
       setLoading(true);
       const token = localStorage.getItem('token');
       const response = await axios.get(createApiUrl(`/api/events/${id}`), {
@@ -90,6 +115,14 @@ const EventEdit = () => {
   // Handle save event
   const handleSave = async () => {
     try {
+      // Debug logging for handleSave
+      console.debug('🔍 handleSave called');
+      console.debug('🔍 id from useParams:', id);
+      console.debug('🔍 isCreating:', isCreating);
+      console.debug('🔍 typeof id:', typeof id);
+      console.debug('🔍 id === "new":', id === 'new');
+      console.debug('🔍 id === undefined:', id === undefined);
+      
       // Validation
       if (!formData.eventName.trim()) {
         toast.error('请输入赛事名称');
@@ -133,15 +166,22 @@ const EventEdit = () => {
         scoreWeight: parseFloat(formData.scoreWeight) || 1
       };
       
+      console.debug('🔍 About to make API call');
+      console.debug('🔍 isCreating check:', isCreating);
+      
       if (isCreating) {
         // Create new event
-        await axios.post(createApiUrl('/api/events'), submitData, {
+        const createUrl = createApiUrl('/api/events');
+        console.debug('🔍 Creating new event with POST to:', createUrl);
+        await axios.post(createUrl, submitData, {
           headers: { Authorization: `Bearer ${token}` }
         });
         toast.success('赛事创建成功');
       } else {
         // Update existing event
-        await axios.put(createApiUrl(`/api/events/${id}`), submitData, {
+        const updateUrl = createApiUrl(`/api/events/${id}`);
+        console.debug('🔍 Updating existing event with PUT to:', updateUrl);
+        await axios.put(updateUrl, submitData, {
           headers: { Authorization: `Bearer ${token}` }
         });
         toast.success('赛事更新成功');

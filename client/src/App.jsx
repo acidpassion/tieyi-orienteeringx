@@ -30,6 +30,7 @@ import EventRegistration from './pages/EventRegistration';
 import EventRegistrationDetail from './pages/EventRegistrationDetail';
 import JoinRelayTeam from './pages/JoinRelayTeam';
 import ITEvents from './pages/it/Events';
+import ConfigurationManagement from './pages/ConfigurationManagement';
 
 function App() {
   return (
@@ -267,6 +268,16 @@ function App() {
                 <ProtectedRoute>
                   <Layout>
                     <ITEvents />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/configurations"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <ConfigurationManagement />
                   </Layout>
                 </ProtectedRoute>
               }

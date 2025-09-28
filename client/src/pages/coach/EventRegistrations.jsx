@@ -49,69 +49,49 @@ const EventRegistrations = () => {
       setRegistrations(registrations);
       setStats(response.data.stats || { total: 0, confirmed: 0, pending: 0, cancelled: 0 });
       
-      // Extract relay teams from registrations
-      const relayTeamsData = [];
+      // Extract unique relay teams from registrations using inviteCode
+      const relayTeamsMap = new Map();
       registrations.forEach(registration => {
         if (registration.gameTypes && Array.isArray(registration.gameTypes)) {
           registration.gameTypes.forEach(gameType => {
-            if ((gameType.name === '接力赛' || gameType.name?.includes('接力')) && gameType.team && gameType.team.members && gameType.team.members.length > 0) {
-              console.log('Debug - Relay team gameType:', gameType);
-              console.log('Debug - Team members:', gameType.team.members);
+            if ((gameType.name === '接力赛' || gameType.name === '团队赛' || gameType.name?.includes('接力')) && 
+                gameType.team && gameType.team.members && gameType.team.members.length > 0 && 
+                gameType.inviteCode) {
               
-              relayTeamsData.push({
-                _id: gameType._id || `${registration._id}_${gameType.name}`,
-                teamName: gameType.team.name || '未命名团队',
-                gameType: gameType.name,
-                group: gameType.group,
-                members: gameType.team.members.map((member, index) => {
-                  console.log(`Debug - Processing member ${index}:`, member);
-                  
-                  // Check if member is just an ID string or has student data
-                  let studentData = null;
-                  let memberId = null;
-                  
-                  if (typeof member === 'string') {
-                    // Member is just an ID
-                    memberId = member;
-                    // Try to find student data from registrations
-                    const studentReg = registrations.find(reg => reg.student?._id === member);
-                    studentData = studentReg?.student;
-                  } else if (member._id) {
-                    // Member is an object with _id
-                    memberId = member._id;
-                    studentData = member.student || member;
+              // Use inviteCode as unique identifier to avoid duplicates
+              if (!relayTeamsMap.has(gameType.inviteCode)) {
+                relayTeamsMap.set(gameType.inviteCode, {
+                  _id: gameType.inviteCode,
+                  teamName: gameType.team.name || '未命名团队',
+                  gameType: gameType.name,
+                  group: gameType.group,
+                  members: gameType.team.members.map((member, index) => {
+                    // Find student data from registrations
+                    let studentData = null;
+                    let memberId = typeof member === 'string' ? member : member._id;
                     
-                    // If no student data, try to find from registrations
-                    if (!studentData?.name) {
-                      const studentReg = registrations.find(reg => reg.student?._id === memberId);
-                      studentData = studentReg?.student;
-                    }
-                  }
-                  
-                  console.log(`Debug - Member ${index} processed:`, {
-                    memberId,
-                    studentData,
-                    hasName: !!studentData?.name,
-                    hasAvatar: !!studentData?.avatar
-                  });
-                  
-                  return {
-                    _id: memberId,
-                    student: studentData,
-                    name: studentData?.name || '未知成员',
-                    runOrder: member.runOrder || (index + 1)
-                  };
-                }),
-                inviteCode: gameType.inviteCode,
-                isFull: gameType.team.members.length >= 3,
-                createdAt: registration.createdAt,
-                status: registration.status
-              });
+                    const studentReg = registrations.find(reg => reg.student?._id === memberId);
+                    studentData = studentReg?.student;
+                    
+                    return {
+                      _id: memberId,
+                      student: studentData,
+                      name: studentData?.name || '未知成员',
+                      runOrder: member.runOrder || (index + 1),
+                      captain: member.captain || false
+                    };
+                  }).sort((a, b) => a.runOrder - b.runOrder), // Sort by run order
+                  inviteCode: gameType.inviteCode,
+                  isFull: gameType.team.members.length >= 2, // Relay teams need at least 2 members
+                  createdAt: registration.createdAt,
+                  status: registration.status
+                });
+              }
             }
           });
         }
       });
-      setRelayTeams(relayTeamsData);
+      setRelayTeams(Array.from(relayTeamsMap.values()));
     } catch (error) {
       console.error('获取报名信息失败:', error);
       toast.error('获取报名信息失败');
@@ -378,104 +358,96 @@ const EventRegistrations = () => {
       )}
 
       {activeTab === 'relay' && (
-        <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-700">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    团队名称
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    项目类型
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    成员
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    状态
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    创建时间
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {relayTeams.map((team) => (
-                  <tr key={team._id}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900 dark:text-white">
-                        {team.teamName}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                      {typeof team.gameType === 'string' ? team.gameType : team.gameType?.name || team.gameType}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-gray-900 dark:text-white">
-                        {team.members && team.members.length > 0 ? (
-                          team.members.map((member, index) => (
-                            <div key={member._id || index} className="flex items-center space-x-3 mb-2">
-                              <div className="flex-shrink-0 h-8 w-8">
-                                {member.student?.avatar && member.student.avatar.startsWith('data:image') ? (
-                                  <img
-                                    className="h-8 w-8 rounded-full object-cover"
-                                    src={member.student.avatar}
-                                    alt={member.student.name || '成员头像'}
-                                    onError={(e) => {
-                                      e.target.style.display = 'none';
-                                      e.target.nextSibling.style.display = 'flex';
-                                    }}
-                                  />
-                                ) : (
-                                  <div className="h-8 w-8 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
-                                    <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                                      {member.student?.name?.charAt(0) || member.name?.charAt(0) || '?'}
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                              <div>
-                                <div className="font-medium">
-                                  {member.student?.name || member.name || '未知成员'}
-                                </div>
-                                {member.runOrder && (
-                                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                                    第{member.runOrder}棒
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          ))
-                        ) : (
-                          <span className="text-gray-400">暂无成员</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+        <div className="space-y-6">
+          {relayTeams.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-4">
+              {relayTeams.map((team) => (
+                <div key={team._id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 border border-gray-200 dark:border-gray-700">
+                  {/* Team Header */}
+                  <div className="mb-3">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white truncate" title={team.teamName}>
+                      {team.teamName}
+                    </h3>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded">
+                        {team.gameType}
+                      </span>
+                      <span className={`text-xs px-2 py-1 rounded-full ${
                         team.isFull
-                          ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100'
-                          : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100'
+                          ? 'bg-green-100 text-green-700 dark:bg-green-800 dark:text-green-100'
+                          : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-800 dark:text-yellow-100'
                       }`}>
                         {team.isFull ? '已满员' : '招募中'}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {new Date(team.createdAt).toLocaleDateString('zh-CN')}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {relayTeams.length === 0 && (
-              <div className="text-center py-12">
-                <Trophy className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">暂无团队</h3>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">还没有接力团队报名此赛事</p>
-              </div>
-            )}
-          </div>
+                    </div>
+                  </div>
+
+                  {/* Team Members */}
+                  <div className="space-y-2 mb-3">
+                    {team.members && team.members.length > 0 ? (
+                      team.members.map((member, index) => (
+                        <div key={member._id || index} className="flex items-center space-x-2">
+                          <div className="flex-shrink-0 h-6 w-6">
+                            {member.student?.avatar && member.student.avatar.startsWith('data:image') ? (
+                              <img
+                                className="h-6 w-6 rounded-full object-cover"
+                                src={member.student.avatar}
+                                alt={member.student.name || '成员头像'}
+                                onError={(e) => {
+                                  e.target.style.display = 'none';
+                                  e.target.nextSibling.style.display = 'flex';
+                                }}
+                              />
+                            ) : (
+                              <div className="h-6 w-6 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
+                                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                                  {member.student?.name?.charAt(0) || member.name?.charAt(0) || '?'}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center space-x-1">
+                              <span className="text-xs font-medium text-gray-900 dark:text-white truncate">
+                                {member.student?.name || member.name || '未知成员'}
+                              </span>
+                              {member.captain && (
+                                <span className="text-xs text-yellow-600 dark:text-yellow-400">👑</span>
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              第{member.runOrder}棒
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-xs text-gray-400">暂无成员</span>
+                    )}
+                  </div>
+
+                  {/* Team Footer */}
+                  <div className="pt-2 border-t border-gray-100 dark:border-gray-700">
+                    <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                      <span>{team.group}</span>
+                      <span>{new Date(team.createdAt).toLocaleDateString('zh-CN')}</span>
+                    </div>
+                    {team.inviteCode && (
+                      <div className="mt-1 text-xs text-gray-400 dark:text-gray-500 font-mono">
+                        {team.inviteCode}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg shadow">
+              <Trophy className="mx-auto h-12 w-12 text-gray-400" />
+              <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">暂无团队</h3>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">还没有接力团队报名此赛事</p>
+            </div>
+          )}
         </div>
       )}
     </div>

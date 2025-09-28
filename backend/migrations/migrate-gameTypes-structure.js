@@ -89,7 +89,7 @@ async function migrateGameTypesStructure() {
 
 // Run migration if called directly
 if (require.main === module) {
-  mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/orienteering_quiz')
+  mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/orienteeringx')
     .then(() => {
       console.log('Connected to MongoDB');
       return migrateGameTypesStructure();

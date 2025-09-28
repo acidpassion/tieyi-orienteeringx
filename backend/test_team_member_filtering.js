@@ -5,7 +5,7 @@ const Student = require('./models/Student');
 const { getTeamSizeForGameType, validateTeamSize } = require('./constants/teamConstants');
 
 // Connect to MongoDB
-mongoose.connect('mongodb://localhost:27017/orienteering_quiz_app', {
+mongoose.connect('mongodb://localhost:27017/orienteeringx', {
   useNewUrlParser: true,
   useUnifiedTopology: true
 });

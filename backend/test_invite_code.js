@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const EventRegistration = require('./models/EventRegistration');
 
 // 连接数据库
-mongoose.connect('mongodb://localhost:27017/orienteering_quiz', {
+mongoose.connect('mongodb://localhost:27017/orienteeringx', {
   useNewUrlParser: true,
   useUnifiedTopology: true
 });

@@ -84,6 +84,16 @@
             "date": 1758852863167,
             "name": "/Users/alex/dev/orienteering_quiz_app/backend/logs/error-2025-09-26.log",
             "hash": "75a404600d800af001e804e1642299bc4305d7e1ccb9269948f47d466dcd5308"
+        },
+        {
+            "date": 1758902504320,
+            "name": "/Users/alex/dev/orienteering_quiz_app/backend/logs/error-2025-09-27.log",
+            "hash": "ef03362fa47d21893374eeef810073ec2288698d3a19c37f7fb9a6a44fcce87a"
+        },
+        {
+            "date": 1758989898864,
+            "name": "/Users/alex/dev/orienteering_quiz_app/backend/logs/error-2025-09-28.log",
+            "hash": "396a1389524547022c56ca2303da8186c0f7b4e436a09cf168fabcaba9fd4efd"
         }
     ],
     "hashType": "sha256"
