@@ -897,6 +897,71 @@ router.put('/:id', verifyToken, verifyCoachOrStudent, async (req, res) => {
       console.log('✅ Final processed gameTypes:', JSON.stringify(processedGameTypes, null, 2));
     }
 
+    // Handle team synchronization if gameTypes were updated
+    if (gameTypes !== undefined) {
+      // Find removed relay/team games that need team cleanup
+      const existingRelayGames = existingRegistration.gameTypes.filter(gt => 
+        ['接力赛', '团队赛'].includes(gt.name) && gt.inviteCode
+      );
+      
+      const newRelayGames = processedGameTypes.filter(gt => 
+        ['接力赛', '团队赛'].includes(gt.name) && gt.inviteCode
+      );
+      
+      // Find games that were removed
+      const removedRelayGames = existingRelayGames.filter(existing => 
+        !newRelayGames.some(newGame => newGame.inviteCode === existing.inviteCode)
+      );
+      
+      // Clean up team data for removed relay games
+      for (const removedGame of removedRelayGames) {
+        console.log(`🧹 Cleaning up team data for removed game: ${removedGame.name}, invite code: ${removedGame.inviteCode}`);
+        
+        // Find all other team members with this invite code
+        const teamRegistrations = await EventRegistration.find({
+          'gameTypes.inviteCode': removedGame.inviteCode,
+          _id: { $ne: req.params.id } // Exclude current registration
+        });
+        
+        // Remove the leaving member from other team members' registrations
+        for (const teamReg of teamRegistrations) {
+          let updated = false;
+          teamReg.gameTypes = teamReg.gameTypes.map(gt => {
+            if (gt.inviteCode === removedGame.inviteCode && gt.team && gt.team.members) {
+              // Remove the leaving member from team
+              const originalMemberCount = gt.team.members.length;
+              gt.team.members = gt.team.members.filter(member => 
+                member._id.toString() !== existingRegistration.studentId.toString()
+              );
+              
+              if (gt.team.members.length < originalMemberCount) {
+                updated = true;
+                console.log(`🗑️ Removed member ${existingRegistration.studentId} from team ${gt.team.name}`);
+                
+                // Reassign captain if the leaving member was captain
+                const hadCaptain = gt.team.members.some(member => member.captain);
+                if (!hadCaptain && gt.team.members.length > 0) {
+                  gt.team.members[0].captain = true;
+                  console.log(`👑 Reassigned captain to ${gt.team.members[0]._id}`);
+                }
+                
+                // Update run orders if needed
+                gt.team.members.forEach((member, index) => {
+                  member.runOrder = index + 1;
+                });
+              }
+            }
+            return gt;
+          });
+          
+          if (updated) {
+            await teamReg.save();
+            console.log(`✅ Updated team registration for student ${teamReg.studentId}`);
+          }
+        }
+      }
+    }
+
     logger.logDatabase('Updating registration', 'eventRegistrations', { _id: req.params.id }, updateData);
 
     const registration = await EventRegistration.findByIdAndUpdate(
@@ -914,7 +979,8 @@ router.put('/:id', verifyToken, verifyCoachOrStudent, async (req, res) => {
       requestId,
       registrationId: registration._id,
       status: registration.status,
-      userId: req.user._id
+      userId: req.user._id,
+      teamSyncPerformed: gameTypes !== undefined
     });
 
     res.json(registration);
@@ -1366,7 +1432,7 @@ router.get('/event/:eventId/export', verifyToken, verifyCoach, async (req, res) 
     
     // Sub headers for relay (row 7)
     worksheet.getCell('L7').value = '组别';
-    worksheet.getCell('M7').value = '接力';
+    worksheet.getCell('M7').value = '棒次';
 
     // Process registrations and organize data
     const relayTeamsMap = new Map();
@@ -1425,17 +1491,29 @@ router.get('/event/:eventId/export', verifyToken, verifyCoach, async (req, res) 
           worksheet.getCell(`G${currentRow}`).value = ''; // 年龄 - blank
           
           // Individual events - check if this student has individual registrations
-          const individualReg = individualRegistrations.find(reg => 
+          const studentIndividualRegs = individualRegistrations.filter(reg => 
             reg.student._id.toString() === student._id.toString()
           );
-          if (individualReg) {
-            worksheet.getCell(`H${currentRow}`).value = individualReg.group;
-            worksheet.getCell(`I${currentRow}`).value = individualReg.gameType;
+          
+          if (studentIndividualRegs.length > 0) {
+            // Set group for individual events
+            worksheet.getCell(`H${currentRow}`).value = studentIndividualRegs[0].group;
+            
+            // Check each individual game type and mark with √
+            studentIndividualRegs.forEach(reg => {
+              if (reg.gameType === '短距离') {
+                worksheet.getCell(`I${currentRow}`).value = '√';
+              } else if (reg.gameType === '积分') {
+                worksheet.getCell(`J${currentRow}`).value = '√';
+              } else if (reg.gameType === '百米') {
+                worksheet.getCell(`K${currentRow}`).value = '√';
+              }
+            });
           }
           
-          // Relay events
+          // Relay events - show group and run order
           worksheet.getCell(`L${currentRow}`).value = team.group;
-          worksheet.getCell(`M${currentRow}`).value = team.gameType;
+          worksheet.getCell(`M${currentRow}`).value = member.runOrder;
           
           currentRow++;
         }
@@ -1457,8 +1535,22 @@ router.get('/event/:eventId/export', verifyToken, verifyCoach, async (req, res) 
       !relayStudentIds.has(reg.student._id.toString())
     );
 
+    // Group individual-only registrations by student
+    const individualOnlyByStudent = new Map();
     individualOnlyRegs.forEach(reg => {
-      const student = reg.student;
+      const studentId = reg.student._id.toString();
+      if (!individualOnlyByStudent.has(studentId)) {
+        individualOnlyByStudent.set(studentId, {
+          student: reg.student,
+          gameTypes: []
+        });
+      }
+      individualOnlyByStudent.get(studentId).gameTypes.push(reg);
+    });
+
+    // Add individual-only students
+    individualOnlyByStudent.forEach(studentData => {
+      const student = studentData.student;
       worksheet.getCell(`A${currentRow}`).value = sequenceNumber;
       worksheet.getCell(`B${currentRow}`).value = ''; // CH卡号 - blank
       worksheet.getCell(`C${currentRow}`).value = student.name || '';
@@ -1468,9 +1560,20 @@ router.get('/event/:eventId/export', verifyToken, verifyCoach, async (req, res) 
         student.birthday.toLocaleDateString('zh-CN') : '';
       worksheet.getCell(`G${currentRow}`).value = ''; // 年龄 - blank
       
-      // Individual events
-      worksheet.getCell(`H${currentRow}`).value = reg.group;
-      worksheet.getCell(`I${currentRow}`).value = reg.gameType;
+      // Individual events - set group and mark game types with √
+      if (studentData.gameTypes.length > 0) {
+        worksheet.getCell(`H${currentRow}`).value = studentData.gameTypes[0].group;
+        
+        studentData.gameTypes.forEach(reg => {
+          if (reg.gameType === '短距离') {
+            worksheet.getCell(`I${currentRow}`).value = '√';
+          } else if (reg.gameType === '积分') {
+            worksheet.getCell(`J${currentRow}`).value = '√';
+          } else if (reg.gameType === '百米') {
+            worksheet.getCell(`K${currentRow}`).value = '√';
+          }
+        });
+      }
       
       currentRow++;
       sequenceNumber++;
