@@ -4,7 +4,7 @@ import axios from '../../config/axiosConfig';
 import { toast } from 'react-toastify';
 import { createApiUrl } from '../../config/api';
 import { Calendar, Save, ArrowLeft, Settings, Users, Trophy, MapPin } from 'lucide-react';
-import statics from '../../assets/statics.json';
+import { useConfiguration } from '../../context/ConfigurationContext';
 
 const EventEdit = () => {
   const { id } = useParams();
@@ -21,9 +21,12 @@ const EventEdit = () => {
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('basic');
 
-  // Organization and event type options
-  const organizationOptions = statics.orgs;
-  const eventTypeOptions = statics.eventTypes;
+  // Get configuration data first
+  const { gameTypes: gameTypeOptions, classes: groupOptions, eventTypes, orgs, loading: configLoading } = useConfiguration();
+
+  // Organization and event type options from configuration (with fallbacks)
+  const organizationOptions = orgs || [];
+  const eventTypeOptions = eventTypes || [];
 
   // Form state
   const [formData, setFormData] = useState({
@@ -38,10 +41,6 @@ const EventEdit = () => {
     gameTypes: [], // Array of objects with name and teamSize
     groups: []
   });
-
-  // Game types and groups options from statics
-  const gameTypeOptions = statics.gameTypes;
-  const groupOptions = statics.classes;
 
   // Fetch event data if editing
   useEffect(() => {
@@ -248,7 +247,7 @@ const EventEdit = () => {
     }));
   };
 
-  if (loading) {
+  if (loading || configLoading) {
     return (
       <div className="flex justify-center items-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>

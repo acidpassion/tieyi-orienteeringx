@@ -4,7 +4,7 @@ import { Save, X } from 'lucide-react';
 import { formatTimeInput } from '../utils/timeFormatter';
 import StudentAutocomplete from './StudentAutocomplete';
 import GroupAutocomplete from './GroupAutocomplete';
-import statics from '../assets/statics.json';
+import { useConfiguration } from '../context/ConfigurationContext';
 
 const CompetitionRecordForm = ({ 
   isOpen, 
@@ -15,6 +15,9 @@ const CompetitionRecordForm = ({
   mode = 'create', // 'create' or 'edit'
   initialData = null
 }) => {
+  const { eventTypes, gameTypes } = useConfiguration();
+  const safeEventTypes = eventTypes || [];
+  const safeGameTypes = gameTypes || [];
   const [formData, setFormData] = useState({
     studentId: '',
     name: '',
@@ -252,7 +255,7 @@ const CompetitionRecordForm = ({
               required
             >
               <option value="">选择比赛类型</option>
-              {(statics.eventTypes || []).map((type) => (
+              {safeEventTypes.map((type) => (
                 <option key={type} value={type}>
                   {type}
                 </option>
@@ -272,7 +275,7 @@ const CompetitionRecordForm = ({
               required
             >
               <option value="">选择游戏类型</option>
-              {(statics.gameTypes || []).map((type) => (
+              {safeGameTypes.map((type) => (
                 <option key={type} value={type}>
                   {type}
                 </option>

@@ -4,7 +4,7 @@ import axios from '../../config/axiosConfig';
 import { toast } from 'react-toastify';
 import { createApiUrl } from '../../config/api';
 import { Calendar, Search, Edit, Plus, Trash2, Filter, Users, BarChart3 } from 'lucide-react';
-import statics from '../../assets/statics.json';
+import { useConfiguration } from '../../context/ConfigurationContext';
 
 const Events = () => {
   const navigate = useNavigate();

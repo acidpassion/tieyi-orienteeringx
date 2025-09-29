@@ -65,7 +65,8 @@
     "difficultyGrades": [
         {
             "number": 1,
-            "color": "#BBF451",
+            "color": "绿色",
+            "colorCode": "#BBF451",
             "level": "入门",
             "skill": [
                 "定向运动的相关知识及技能应用",
@@ -78,7 +79,8 @@
         },
         {
             "number": 2,
-            "color": "#FFFFFF",
+            "color": "白色",
+            "colorCode": "#FFFFFF",
             "level": "简单一",
             "skill": [
                 "指北针的常定方法",
@@ -91,7 +93,8 @@
         },
         {
             "number": 3,
-            "color": "#FFF085",
+            "color": "黄色",
+            "colorCode": "#FFF085",
             "level": "简单二",
             "skill": [
                 "园例的实地应用（包括表示方式和地形地貌）",
@@ -103,7 +106,8 @@
         },
         {
             "number": 4,
-            "color": "#FFB93B",
+            "color": "橙色",
+            "colorCode": "#FFB93B",
             "level": "中等一",
             "skill": [
                 "路线选择的多样性",
@@ -115,7 +119,8 @@
         },
         {
             "number": 5,
-            "color": "#FF6467",
+            "color": "红色",
+            "colorCode": "#FF6467",
             "level": "中等二",
             "skill": [
                 "山地地形和等高线的掌握",
@@ -127,7 +132,8 @@
         },
         {
             "number": 6,
-            "color": "#8207DB",
+            "color": "紫色",
+            "colorCode": "#8207DB",
             "level": "中等三",
             "skill": [
                 "山地地形的路线选择",
@@ -139,7 +145,8 @@
         },
         {
             "number": 7,
-            "color": "#2B7FFF",
+            "color": "蓝色",
+            "colorCode": "#2B7FFF",
             "level": "困难一",
             "skill": [
                 "快速跑技能的学习方法",
@@ -151,7 +158,8 @@
         },
         {
             "number": 8,
-            "color": "#000000",
+            "color": "黑色",
+            "colorCode": "#000000",
             "level": "困难二",
             "skill": [
                 "快速评技能力",

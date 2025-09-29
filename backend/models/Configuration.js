@@ -6,10 +6,15 @@ const difficultyGradeSchema = new mongoose.Schema({
     required: true,
     min: 1
   },
-  color: {
+  colorCode: {
     type: String,
     required: true,
     match: /^#[0-9A-F]{6}$/i // Hex color validation
+  },
+  color: {
+    type: String,
+    required: true,
+    trim: true // Chinese color name
   },
   level: {
     type: String,

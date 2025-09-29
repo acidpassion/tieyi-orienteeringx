@@ -6,6 +6,7 @@ import { ConfirmDialogProvider } from '@omit/react-confirm-dialog';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { LanguageProvider } from './contexts/LanguageContext';
+import { ConfigurationProvider } from './context/ConfigurationContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import Login from './pages/Login';
@@ -38,7 +39,8 @@ function App() {
       <LanguageProvider>
         <ConfirmDialogProvider>
           <AuthProvider>
-            <Router>
+            <ConfigurationProvider>
+              <Router>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<DashboardRedirect />} />
@@ -297,6 +299,7 @@ function App() {
               theme="colored"
               toastClassName="text-sm"
             />
+            </ConfigurationProvider>
           </AuthProvider>
         </ConfirmDialogProvider>
       </LanguageProvider>

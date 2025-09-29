@@ -6,6 +6,7 @@ const EventRegistration = require('../models/EventRegistration');
 const RelayTeam = require('../models/RelayTeam');
 const Student = require('../models/Student');
 const { verifyToken, verifyCoach, verifyCoachOrStudent } = require('../middleware/auth');
+const { validateRegistrationData } = require('../middleware/configurationValidation');
 const logger = require('../utils/logger');
 const ExcelJS = require('exceljs');
 const { getTeamSizeForGameType } = require('../constants/teamConstants');
@@ -112,7 +113,7 @@ const { getTeamSizeForGameType } = require('../constants/teamConstants');
  *       500:
  *         description: Server error
  */
-router.post('/', verifyToken, verifyCoachOrStudent, async (req, res) => {
+router.post('/', verifyToken, verifyCoachOrStudent, validateRegistrationData, async (req, res) => {
   const requestId = req.requestId;
 
 
@@ -853,14 +854,19 @@ router.put('/:id', verifyToken, verifyCoachOrStudent, async (req, res) => {
     if (notes !== undefined) updateData.notes = notes;
     if (teamMembers !== undefined) updateData.teamMembers = teamMembers;
 
+    // Declare processedGameTypes outside the if block
+    let processedGameTypes = [];
+
     // Handle gameTypes update with invite code preservation
     if (gameTypes !== undefined) {
-      console.log('🔄 Processing gameTypes update with invite code preservation');
-      console.log('📥 Incoming gameTypes:', JSON.stringify(gameTypes, null, 2));
+      console.log('� ProcesDsing gameTypes update with invite code preservation');
+      console.log('� Incioming gameTypes:', JSON.stringify(gameTypes, null, 2));
       console.log('📋 Existing gameTypes:', JSON.stringify(existingRegistration.gameTypes, null, 2));
+      console.log('👤 User ID:', req.user._id);
+      console.log('📝 Registration ID:', req.params.id);
 
       // Process each incoming game type
-      const processedGameTypes = [];
+      processedGameTypes = [];
 
       for (const incomingGameType of gameTypes) {
         // Find if this game type already exists in the registration
@@ -884,8 +890,13 @@ router.put('/:id', verifyToken, verifyCoachOrStudent, async (req, res) => {
           const newGameType = { ...incomingGameType };
 
           if (['接力赛', '团队赛'].includes(incomingGameType.name)) {
-            newGameType.inviteCode = await EventRegistration.generateUniqueInviteCode();
-            console.log(`🆕 Generated new invite code for ${incomingGameType.name}: ${newGameType.inviteCode}`);
+            if (typeof EventRegistration.generateUniqueInviteCode === 'function') {
+              newGameType.inviteCode = await EventRegistration.generateUniqueInviteCode();
+              console.log(`🆕 Generated new invite code for ${incomingGameType.name}: ${newGameType.inviteCode}`);
+            } else {
+              console.error('❌ generateUniqueInviteCode method not found on EventRegistration model');
+              throw new Error('generateUniqueInviteCode method not available');
+            }
           }
 
           newGameType._id = new mongoose.Types.ObjectId();
@@ -985,11 +996,24 @@ router.put('/:id', verifyToken, verifyCoachOrStudent, async (req, res) => {
 
     res.json(registration);
   } catch (error) {
+    console.error('❌ Registration update error:', error);
     logger.logError(error, req);
+    
     if (error.name === 'ValidationError') {
+      console.error('Validation error details:', error.message);
       return res.status(400).json({ message: error.message });
     }
-    res.status(500).json({ message: 'Server error' });
+    
+    if (error.name === 'CastError') {
+      console.error('Cast error details:', error.message);
+      return res.status(400).json({ message: '无效的数据格式' });
+    }
+    
+    console.error('Unexpected error:', error.message, error.stack);
+    res.status(500).json({ 
+      message: 'Server error', 
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined 
+    });
   }
 });
 

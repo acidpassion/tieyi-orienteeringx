@@ -14,9 +14,12 @@ const logger = require('../utils/logger');
  *         number:
  *           type: number
  *           minimum: 1
+ *         colorCode:
+ *           type: string
+ *           pattern: '^#[0-9A-F]{6}
  *         color:
  *           type: string
- *           pattern: '^#[0-9A-F]{6}$'
+ *           description: Chinese color name$'
  *         level:
  *           type: string
  *         skill:
@@ -175,16 +178,23 @@ router.put('/', verifyToken, verifyCoach, async (req, res) => {
     const seenNumbers = new Set();
     
     for (const grade of difficultyGrades) {
-      if (!grade.number || !grade.color || !grade.level || !Array.isArray(grade.skill)) {
+      if (!grade.number || !grade.colorCode || !grade.color || !grade.level || !Array.isArray(grade.skill)) {
         return res.status(400).json({ 
           message: '难度等级配置格式不正确' 
         });
       }
       
-      // Validate hex color format
-      if (!/^#[0-9A-F]{6}$/i.test(grade.color)) {
+      // Validate hex color format for colorCode
+      if (!/^#[0-9A-F]{6}$/i.test(grade.colorCode)) {
         return res.status(400).json({ 
-          message: `无效的颜色格式: ${grade.color}` 
+          message: `无效的颜色代码格式: ${grade.colorCode}` 
+        });
+      }
+      
+      // Validate color name is not empty
+      if (!grade.color.trim()) {
+        return res.status(400).json({ 
+          message: '颜色名称不能为空' 
         });
       }
 
@@ -308,16 +318,23 @@ router.put('/:section', verifyToken, verifyCoach, async (req, res) => {
       const seenNumbers = new Set();
       
       for (const grade of data) {
-        if (!grade.number || !grade.color || !grade.level || !Array.isArray(grade.skill)) {
+        if (!grade.number || !grade.colorCode || !grade.color || !grade.level || !Array.isArray(grade.skill)) {
           return res.status(400).json({ 
             message: '难度等级配置格式不正确' 
           });
         }
         
-        // Validate hex color format
-        if (!/^#[0-9A-F]{6}$/i.test(grade.color)) {
+        // Validate hex color format for colorCode
+        if (!/^#[0-9A-F]{6}$/i.test(grade.colorCode)) {
           return res.status(400).json({ 
-            message: `无效的颜色格式: ${grade.color}` 
+            message: `无效的颜色代码格式: ${grade.colorCode}` 
+          });
+        }
+        
+        // Validate color name is not empty
+        if (!grade.color.trim()) {
+          return res.status(400).json({ 
+            message: '颜色名称不能为空' 
           });
         }
 

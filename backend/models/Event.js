@@ -46,7 +46,6 @@ const eventSchema = new mongoose.Schema({
   organization: {
     type: String,
     required: true,
-    enum: ["国家体育总局", "广州市教育局", "小马越野", "香山定向", "华瑞健","巨浪","华农","广东省户外运动协会","广东省军事体育运动协会","广东省户外运动协会无线电测向和定向运动委员会","广东省嶝柏仕体育产业股份有限公司"],
     trim: true
   },
   startDate: {
@@ -60,7 +59,6 @@ const eventSchema = new mongoose.Schema({
   eventType: {
     type: String,
     required: true,
-    enum: ['国家级赛事', '省级赛', '市级赛', '区级赛', '社会普级类赛事(省联赛,古驿道,冠军赛等)', '常规训练'],
     trim: true
   },
   location: {

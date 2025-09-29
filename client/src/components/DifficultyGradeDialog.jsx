@@ -4,7 +4,8 @@ import { X, Plus, Trash2, Palette } from 'lucide-react';
 const DifficultyGradeDialog = ({ isOpen, mode, data, onSubmit, onClose, isDarkMode, existingGrades = [] }) => {
   const [formData, setFormData] = useState({
     number: '',
-    color: '#3B82F6',
+    colorCode: '#3B82F6',
+    color: '',
     level: '',
     skill: [''],
     matchingEventType: ''
@@ -17,7 +18,8 @@ const DifficultyGradeDialog = ({ isOpen, mode, data, onSubmit, onClose, isDarkMo
       if (mode === 'edit' && data) {
         setFormData({
           number: data.number || '',
-          color: data.color || '#3B82F6',
+          colorCode: data.colorCode || '#3B82F6',
+          color: data.color || '',
           level: data.level || '',
           skill: data.skill && data.skill.length > 0 ? [...data.skill] : [''],
           matchingEventType: data.matchingEventType || ''
@@ -25,7 +27,8 @@ const DifficultyGradeDialog = ({ isOpen, mode, data, onSubmit, onClose, isDarkMo
       } else {
         setFormData({
           number: '',
-          color: '#3B82F6',
+          colorCode: '#3B82F6',
+          color: '',
           level: '',
           skill: [''],
           matchingEventType: ''
@@ -68,8 +71,12 @@ const DifficultyGradeDialog = ({ isOpen, mode, data, onSubmit, onClose, isDarkMo
       }
     }
 
-    if (!formData.color || !/^#[0-9A-F]{6}$/i.test(formData.color)) {
-      newErrors.color = '请选择有效的颜色';
+    if (!formData.colorCode || !/^#[0-9A-F]{6}$/i.test(formData.colorCode)) {
+      newErrors.colorCode = '请选择有效的颜色代码';
+    }
+
+    if (!formData.color.trim()) {
+      newErrors.color = '颜色名称不能为空';
     }
 
     const validSkills = formData.skill.filter(skill => skill.trim());
@@ -188,27 +195,27 @@ const DifficultyGradeDialog = ({ isOpen, mode, data, onSubmit, onClose, isDarkMo
             )}
           </div>
 
-          {/* Color Selection */}
+          {/* Color Code Selection */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              等级颜色 *
+              颜色代码 *
             </label>
             <div className="space-y-3">
               <div className="flex items-center space-x-3">
                 <div
                   className="w-8 h-8 rounded-full border-2 border-gray-300 dark:border-gray-600"
-                  style={{ backgroundColor: formData.color }}
+                  style={{ backgroundColor: formData.colorCode }}
                 ></div>
                 <input
                   type="color"
-                  value={formData.color}
-                  onChange={(e) => setFormData(prev => ({ ...prev, color: e.target.value }))}
+                  value={formData.colorCode}
+                  onChange={(e) => setFormData(prev => ({ ...prev, colorCode: e.target.value }))}
                   className="w-16 h-8 border border-gray-300 dark:border-gray-600 rounded cursor-pointer"
                 />
                 <input
                   type="text"
-                  value={formData.color}
-                  onChange={(e) => setFormData(prev => ({ ...prev, color: e.target.value }))}
+                  value={formData.colorCode}
+                  onChange={(e) => setFormData(prev => ({ ...prev, colorCode: e.target.value }))}
                   className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   placeholder="#3B82F6"
                 />
@@ -220,9 +227,9 @@ const DifficultyGradeDialog = ({ isOpen, mode, data, onSubmit, onClose, isDarkMo
                   <button
                     key={color}
                     type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, color }))}
+                    onClick={() => setFormData(prev => ({ ...prev, colorCode: color }))}
                     className={`w-6 h-6 rounded-full border-2 ${
-                      formData.color === color 
+                      formData.colorCode === color 
                         ? 'border-gray-800 dark:border-white' 
                         : 'border-gray-300 dark:border-gray-600'
                     }`}
@@ -231,6 +238,27 @@ const DifficultyGradeDialog = ({ isOpen, mode, data, onSubmit, onClose, isDarkMo
                 ))}
               </div>
             </div>
+            {errors.colorCode && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.colorCode}</p>
+            )}
+          </div>
+
+          {/* Color Name */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              颜色名称 *
+            </label>
+            <input
+              type="text"
+              value={formData.color}
+              onChange={(e) => setFormData(prev => ({ ...prev, color: e.target.value }))}
+              className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                errors.color 
+                  ? 'border-red-300 dark:border-red-600' 
+                  : 'border-gray-300 dark:border-gray-600'
+              }`}
+              placeholder="例如：蓝色、红色、绿色"
+            />
             {errors.color && (
               <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.color}</p>
             )}

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
-import statics from '../assets/statics.json';
+import { useConfiguration } from '../context/ConfigurationContext';
 
 const GroupAutocomplete = ({ value, onChange, placeholder = "选择或输入组别...", required = false }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -9,8 +9,9 @@ const GroupAutocomplete = ({ value, onChange, placeholder = "选择或输入组�
   const inputRef = useRef(null);
   const dropdownRef = useRef(null);
 
-  // Get group options from statics
-  const groupOptions = statics.classes || [];
+  // Get group options from configuration
+  const { classes } = useConfiguration();
+  const groupOptions = classes || [];
 
   useEffect(() => {
     setInputValue(value || '');
@@ -46,7 +47,7 @@ const GroupAutocomplete = ({ value, onChange, placeholder = "选择或输入组�
     const newValue = e.target.value;
     setInputValue(newValue);
     setIsOpen(true);
-    
+
     // Call onChange with the new value
     if (onChange) {
       onChange(newValue);
@@ -56,11 +57,11 @@ const GroupAutocomplete = ({ value, onChange, placeholder = "选择或输入组�
   const handleOptionSelect = (option) => {
     setInputValue(option);
     setIsOpen(false);
-    
+
     if (onChange) {
       onChange(option);
     }
-    
+
     // Focus back to input
     if (inputRef.current) {
       inputRef.current.focus();

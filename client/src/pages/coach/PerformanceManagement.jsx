@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { Award, Filter, Search, Plus, Edit3, Trash2, Download, Upload, Calendar, Trophy, Medal, Target, User, Eye } from 'lucide-react';
 import { toast } from "react-toastify";
 
-import statics from '../../assets/statics.json';
+import { useConfiguration } from '../../context/ConfigurationContext';
 import CompetitionRecordForm from '../../components/CompetitionRecordForm';
 
 const PerformanceManagement = () => {
   const navigate = useNavigate();
+  const { gameTypes: configGameTypes } = useConfiguration();
+  const safeConfigGameTypes = configGameTypes || [];
   const [loading, setLoading] = useState(true);
   const [isFiltering, setIsFiltering] = useState(false);
   const [completionRecords, setCompletionRecords] = useState([]);
@@ -127,9 +129,9 @@ const PerformanceManagement = () => {
       });
       console.log('👥 Students response status:', studentsResponse.status, studentsResponse.statusText);
 
-      // Use game types from statics.json
-      console.log('🏆 Using game types from statics.json...');
-      setGameTypes(statics.gameTypes);
+      // Use game types from configuration
+      console.log('🏆 Using game types from configuration...');
+      setGameTypes(safeConfigGameTypes);
 
       // No need to fetch game types separately, use eventTypes data
 
@@ -172,8 +174,8 @@ const PerformanceManagement = () => {
         console.log('❌ Students response not ok:', studentsResponse.status);
       }
       
-      // Event types and game types are already set from statics.json above
-      console.log('✅ Event types and game types set from statics.json');
+      // Event types and game types are already set from configuration above
+      console.log('✅ Event types and game types set from configuration');
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('获取数据失败');

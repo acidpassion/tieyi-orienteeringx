@@ -523,7 +523,7 @@ const DifficultyGradesSection = ({ grades, onEdit, onDelete, onAdd, isDarkMode, 
               <div className="flex items-center space-x-3">
                 <div
                   className="w-6 h-6 rounded-full border-2 border-gray-300"
-                  style={{ backgroundColor: grade.color }}
+                  style={{ backgroundColor: grade.colorCode || grade.color }}
                 ></div>
                 <div>
                   <span className="font-medium text-gray-900 dark:text-white">
@@ -531,6 +531,9 @@ const DifficultyGradesSection = ({ grades, onEdit, onDelete, onAdd, isDarkMode, 
                   </span>
                   <div className="text-sm text-gray-600 dark:text-gray-400">
                     {grade.level}
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-500">
+                    {grade.color} ({grade.colorCode || grade.color})
                   </div>
                 </div>
               </div>

@@ -2,6 +2,7 @@ const express = require('express');
 const Event = require('../models/Event');
 const CompletionRecord = require('../models/CompletionRecord');
 const { verifyToken, verifyCoach, verifyCoachOrStudent } = require('../middleware/auth');
+const { validateEventData } = require('../middleware/configurationValidation');
 const logger = require('../utils/logger');
 
 const router = express.Router();
@@ -211,7 +212,7 @@ router.get('/', verifyToken, verifyCoachOrStudent, async (req, res) => {
 });
 
 
-router.post('/', verifyToken, verifyCoach, async (req, res) => {
+router.post('/', verifyToken, verifyCoach, validateEventData, async (req, res) => {
   const requestId = req.requestId;
   logger.info('HTTP Request', {
     requestId,
@@ -508,7 +509,7 @@ router.get('/:id', verifyToken, verifyCoachOrStudent, async (req, res) => {
   }
 });
 
-router.put('/:id', verifyToken, verifyCoach, async (req, res) => {
+router.put('/:id', verifyToken, verifyCoach, validateEventData, async (req, res) => {
   const requestId = req.requestId;
   logger.info('HTTP Request', {
     requestId,
