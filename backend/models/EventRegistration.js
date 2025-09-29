@@ -58,6 +58,11 @@ const eventRegistrationSchema = new mongoose.Schema({
       required: true,
       trim: true
     },
+    difficultyGrade: {
+      type: String,
+      trim: true,
+      default: ''
+    },
     // 统一的team结构，支持接力赛和团队赛
     team: {
       name: {

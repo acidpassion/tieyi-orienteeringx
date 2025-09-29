@@ -75,6 +75,9 @@ const { getTeamSizeForGameType } = require('../constants/teamConstants');
  *                     group:
  *                       type: string
  *                       description: 参赛组别
+ *                     difficultyGrade:
+ *                       type: string
+ *                       description: 难度等级颜色名称
  *                     team:
  *                       type: object
  *                       description: 接力赛队伍信息
@@ -911,29 +914,29 @@ router.put('/:id', verifyToken, verifyCoachOrStudent, async (req, res) => {
     // Handle team synchronization if gameTypes were updated
     if (gameTypes !== undefined) {
       // Find removed relay/team games that need team cleanup
-      const existingRelayGames = existingRegistration.gameTypes.filter(gt => 
+      const existingRelayGames = existingRegistration.gameTypes.filter(gt =>
         ['接力赛', '团队赛'].includes(gt.name) && gt.inviteCode
       );
-      
-      const newRelayGames = processedGameTypes.filter(gt => 
+
+      const newRelayGames = processedGameTypes.filter(gt =>
         ['接力赛', '团队赛'].includes(gt.name) && gt.inviteCode
       );
-      
+
       // Find games that were removed
-      const removedRelayGames = existingRelayGames.filter(existing => 
+      const removedRelayGames = existingRelayGames.filter(existing =>
         !newRelayGames.some(newGame => newGame.inviteCode === existing.inviteCode)
       );
-      
+
       // Clean up team data for removed relay games
       for (const removedGame of removedRelayGames) {
         console.log(`🧹 Cleaning up team data for removed game: ${removedGame.name}, invite code: ${removedGame.inviteCode}`);
-        
+
         // Find all other team members with this invite code
         const teamRegistrations = await EventRegistration.find({
           'gameTypes.inviteCode': removedGame.inviteCode,
           _id: { $ne: req.params.id } // Exclude current registration
         });
-        
+
         // Remove the leaving member from other team members' registrations
         for (const teamReg of teamRegistrations) {
           let updated = false;
@@ -941,21 +944,21 @@ router.put('/:id', verifyToken, verifyCoachOrStudent, async (req, res) => {
             if (gt.inviteCode === removedGame.inviteCode && gt.team && gt.team.members) {
               // Remove the leaving member from team
               const originalMemberCount = gt.team.members.length;
-              gt.team.members = gt.team.members.filter(member => 
+              gt.team.members = gt.team.members.filter(member =>
                 member._id.toString() !== existingRegistration.studentId.toString()
               );
-              
+
               if (gt.team.members.length < originalMemberCount) {
                 updated = true;
                 console.log(`🗑️ Removed member ${existingRegistration.studentId} from team ${gt.team.name}`);
-                
+
                 // Reassign captain if the leaving member was captain
                 const hadCaptain = gt.team.members.some(member => member.captain);
                 if (!hadCaptain && gt.team.members.length > 0) {
                   gt.team.members[0].captain = true;
                   console.log(`👑 Reassigned captain to ${gt.team.members[0]._id}`);
                 }
-                
+
                 // Update run orders if needed
                 gt.team.members.forEach((member, index) => {
                   member.runOrder = index + 1;
@@ -964,7 +967,7 @@ router.put('/:id', verifyToken, verifyCoachOrStudent, async (req, res) => {
             }
             return gt;
           });
-          
+
           if (updated) {
             await teamReg.save();
             console.log(`✅ Updated team registration for student ${teamReg.studentId}`);
@@ -998,21 +1001,21 @@ router.put('/:id', verifyToken, verifyCoachOrStudent, async (req, res) => {
   } catch (error) {
     console.error('❌ Registration update error:', error);
     logger.logError(error, req);
-    
+
     if (error.name === 'ValidationError') {
       console.error('Validation error details:', error.message);
       return res.status(400).json({ message: error.message });
     }
-    
+
     if (error.name === 'CastError') {
       console.error('Cast error details:', error.message);
       return res.status(400).json({ message: '无效的数据格式' });
     }
-    
+
     console.error('Unexpected error:', error.message, error.stack);
-    res.status(500).json({ 
-      message: 'Server error', 
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined 
+    res.status(500).json({
+      message: 'Server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
@@ -1436,7 +1439,7 @@ router.get('/event/:eventId/export', verifyToken, verifyCoach, async (req, res) 
     worksheet.getCell('G6').value = '年龄';
     worksheet.getCell('H6').value = '个人项目';
     worksheet.getCell('L6').value = '接力赛';
-    
+
     // Merge cells for main headers
     worksheet.mergeCells('A6:A7');
     worksheet.mergeCells('B6:B7');
@@ -1453,7 +1456,7 @@ router.get('/event/:eventId/export', verifyToken, verifyCoach, async (req, res) 
     worksheet.getCell('I7').value = '短距离';
     worksheet.getCell('J7').value = '积分';
     worksheet.getCell('K7').value = '百米';
-    
+
     // Sub headers for relay (row 7)
     worksheet.getCell('L7').value = '组别';
     worksheet.getCell('M7').value = '棒次';
@@ -1461,7 +1464,7 @@ router.get('/event/:eventId/export', verifyToken, verifyCoach, async (req, res) 
     // Process registrations and organize data
     const relayTeamsMap = new Map();
     const individualRegistrations = [];
-    
+
     registrations.forEach(registration => {
       const student = registration.studentId;
       if (!student) return;
@@ -1475,6 +1478,7 @@ router.get('/event/:eventId/export', verifyToken, verifyCoach, async (req, res) 
               teamName: gameType.team?.name || '未命名团队',
               gameType: gameType.name,
               group: gameType.group,
+              difficultyGrade: gameType.difficultyGrade || '',
               members: gameType.team?.members?.map(member => {
                 const memberReg = registrations.find(reg => reg.studentId._id.toString() === member._id.toString());
                 return {
@@ -1490,7 +1494,8 @@ router.get('/event/:eventId/export', verifyToken, verifyCoach, async (req, res) 
           individualRegistrations.push({
             student,
             gameType: gameType.name,
-            group: gameType.group
+            group: gameType.group,
+            difficultyGrade: gameType.difficultyGrade || ''
           });
         }
       });
@@ -1510,19 +1515,21 @@ router.get('/event/:eventId/export', verifyToken, verifyCoach, async (req, res) 
           worksheet.getCell(`C${currentRow}`).value = student.name || '';
           worksheet.getCell(`D${currentRow}`).value = ''; // 身份证号 - blank
           worksheet.getCell(`E${currentRow}`).value = student.gender || '';
-          worksheet.getCell(`F${currentRow}`).value = student.birthday ? 
+          worksheet.getCell(`F${currentRow}`).value = student.birthday ?
             student.birthday.toLocaleDateString('zh-CN') : '';
           worksheet.getCell(`G${currentRow}`).value = ''; // 年龄 - blank
-          
+
           // Individual events - check if this student has individual registrations
-          const studentIndividualRegs = individualRegistrations.filter(reg => 
+          const studentIndividualRegs = individualRegistrations.filter(reg =>
             reg.student._id.toString() === student._id.toString()
           );
-          
+
           if (studentIndividualRegs.length > 0) {
-            // Set group for individual events
-            worksheet.getCell(`H${currentRow}`).value = studentIndividualRegs[0].group;
-            
+            // Set group for individual events with difficulty grade
+            const groupText = studentIndividualRegs[0].group +
+              (studentIndividualRegs[0].difficultyGrade ? `-${studentIndividualRegs[0].difficultyGrade}` : '');
+            worksheet.getCell(`H${currentRow}`).value = groupText;
+
             // Check each individual game type and mark with √
             studentIndividualRegs.forEach(reg => {
               if (reg.gameType === '短距离') {
@@ -1534,11 +1541,12 @@ router.get('/event/:eventId/export', verifyToken, verifyCoach, async (req, res) 
               }
             });
           }
-          
-          // Relay events - show group and run order
-          worksheet.getCell(`L${currentRow}`).value = team.group;
+
+          // Relay events - show group with difficulty grade and run order
+          const relayGroupText = team.group + (team.difficultyGrade ? `-${team.difficultyGrade}` : '');
+          worksheet.getCell(`L${currentRow}`).value = relayGroupText;
           worksheet.getCell(`M${currentRow}`).value = member.runOrder;
-          
+
           currentRow++;
         }
       });
@@ -1555,7 +1563,7 @@ router.get('/event/:eventId/export', verifyToken, verifyCoach, async (req, res) 
       });
     });
 
-    const individualOnlyRegs = individualRegistrations.filter(reg => 
+    const individualOnlyRegs = individualRegistrations.filter(reg =>
       !relayStudentIds.has(reg.student._id.toString())
     );
 
@@ -1580,14 +1588,16 @@ router.get('/event/:eventId/export', verifyToken, verifyCoach, async (req, res) 
       worksheet.getCell(`C${currentRow}`).value = student.name || '';
       worksheet.getCell(`D${currentRow}`).value = ''; // 身份证号 - blank
       worksheet.getCell(`E${currentRow}`).value = student.gender || '';
-      worksheet.getCell(`F${currentRow}`).value = student.birthday ? 
+      worksheet.getCell(`F${currentRow}`).value = student.birthday ?
         student.birthday.toLocaleDateString('zh-CN') : '';
       worksheet.getCell(`G${currentRow}`).value = ''; // 年龄 - blank
-      
-      // Individual events - set group and mark game types with √
+
+      // Individual events - set group with difficulty grade and mark game types with √
       if (studentData.gameTypes.length > 0) {
-        worksheet.getCell(`H${currentRow}`).value = studentData.gameTypes[0].group;
-        
+        const groupText = studentData.gameTypes[0].group +
+          (studentData.gameTypes[0].difficultyGrade ? `-${studentData.gameTypes[0].difficultyGrade}` : '');
+        worksheet.getCell(`H${currentRow}`).value = groupText;
+
         studentData.gameTypes.forEach(reg => {
           if (reg.gameType === '短距离') {
             worksheet.getCell(`I${currentRow}`).value = '√';
@@ -1598,7 +1608,7 @@ router.get('/event/:eventId/export', verifyToken, verifyCoach, async (req, res) 
           }
         });
       }
-      
+
       currentRow++;
       sequenceNumber++;
     });

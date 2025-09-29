@@ -3,11 +3,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from '../../config/axiosConfig';
 import { toast } from 'react-toastify';
 import { createApiUrl } from '../../config/api';
+import { useConfiguration } from '../../context/ConfigurationContext';
 import { ArrowLeft, Download, Users, Trophy, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 
 const EventRegistrations = () => {
   const { id: eventId } = useParams();
   const navigate = useNavigate();
+  const { difficultyGrades } = useConfiguration();
   const [event, setEvent] = useState(null);
   const [registrations, setRegistrations] = useState([]);
   const [relayTeams, setRelayTeams] = useState([]);
@@ -48,16 +50,16 @@ const EventRegistrations = () => {
       const registrations = response.data.registrations || [];
       setRegistrations(registrations);
       setStats(response.data.stats || { total: 0, confirmed: 0, pending: 0, cancelled: 0 });
-      
+
       // Extract unique relay teams from registrations using inviteCode
       const relayTeamsMap = new Map();
       registrations.forEach(registration => {
         if (registration.gameTypes && Array.isArray(registration.gameTypes)) {
           registration.gameTypes.forEach(gameType => {
-            if ((gameType.name === '接力赛' || gameType.name === '团队赛' || gameType.name?.includes('接力')) && 
-                gameType.team && gameType.team.members && gameType.team.members.length > 0 && 
-                gameType.inviteCode) {
-              
+            if ((gameType.name === '接力赛' || gameType.name === '团队赛' || gameType.name?.includes('接力')) &&
+              gameType.team && gameType.team.members && gameType.team.members.length > 0 &&
+              gameType.inviteCode) {
+
               // Use inviteCode as unique identifier to avoid duplicates
               if (!relayTeamsMap.has(gameType.inviteCode)) {
                 relayTeamsMap.set(gameType.inviteCode, {
@@ -65,14 +67,15 @@ const EventRegistrations = () => {
                   teamName: gameType.team.name || '未命名团队',
                   gameType: gameType.name,
                   group: gameType.group,
+                  difficultyGrade: gameType.difficultyGrade || '',
                   members: gameType.team.members.map((member, index) => {
                     // Find student data from registrations
                     let studentData = null;
                     let memberId = typeof member === 'string' ? member : member._id;
-                    
+
                     const studentReg = registrations.find(reg => reg.student?._id === memberId);
                     studentData = studentReg?.student;
-                    
+
                     return {
                       _id: memberId,
                       student: studentData,
@@ -113,7 +116,7 @@ const EventRegistrations = () => {
           responseType: 'blob'
         }
       );
-      
+
       // Create download link
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
@@ -123,7 +126,7 @@ const EventRegistrations = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      
+
       toast.success('导出成功');
     } catch (error) {
       console.error('导出失败:', error);
@@ -155,9 +158,22 @@ const EventRegistrations = () => {
     }
   };
 
-  const formatGameTypes = (gameTypes) => {
-    if (!gameTypes || gameTypes.length === 0) return '无';
-    return gameTypes.map(gt => typeof gt === 'string' ? gt : gt.name).join(', ');
+  const formatGameTypeWithDetails = (gameType) => {
+    const name = typeof gameType === 'string' ? gameType : gameType.name;
+    const group = typeof gameType === 'object' ? gameType.group : '';
+    const difficultyGrade = typeof gameType === 'object' ? gameType.difficultyGrade : '';
+
+    let result = name;
+    if (group) result += ` (${group}`;
+    if (difficultyGrade) result += group ? `-${difficultyGrade})` : ` (${difficultyGrade})`;
+    else if (group) result += ')';
+
+    return result;
+  };
+
+  const getDifficultyGradeColor = (gradeName) => {
+    const grade = difficultyGrades.find(g => g.color === gradeName);
+    return grade?.colorCode || '#000000';
   };
 
   if (loading) {
@@ -247,21 +263,19 @@ const EventRegistrations = () => {
         <nav className="-mb-px flex space-x-8">
           <button
             onClick={() => setActiveTab('individual')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm ${
-              activeTab === 'individual'
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'individual'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-            }`}
+              }`}
           >
             个人报名
           </button>
           <button
             onClick={() => setActiveTab('relay')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm ${
-              activeTab === 'relay'
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'relay'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-            }`}
+              }`}
           >
             接力团队
           </button>
@@ -328,8 +342,22 @@ const EventRegistrations = () => {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                      {formatGameTypes(registration.gameTypes)}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="space-y-1">
+                        {(registration.gameTypes || []).map((gameType, index) => (
+                          <div key={index} className="flex items-center space-x-2">
+                            <span className="text-sm text-gray-900 dark:text-white">
+                              {formatGameTypeWithDetails(gameType)}
+                            </span>
+                            {typeof gameType === 'object' && gameType.difficultyGrade && (
+                              <div
+                                className="w-3 h-3 rounded-full border border-gray-300 flex-shrink-0"
+                                style={{ backgroundColor: getDifficultyGradeColor(gameType.difficultyGrade) }}
+                              ></div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center space-x-2">
@@ -372,11 +400,10 @@ const EventRegistrations = () => {
                       <span className="text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded">
                         {team.gameType}
                       </span>
-                      <span className={`text-xs px-2 py-1 rounded-full ${
-                        team.isFull
+                      <span className={`text-xs px-2 py-1 rounded-full ${team.isFull
                           ? 'bg-green-100 text-green-700 dark:bg-green-800 dark:text-green-100'
                           : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-800 dark:text-yellow-100'
-                      }`}>
+                        }`}>
                         {team.isFull ? '已满员' : '招募中'}
                       </span>
                     </div>
@@ -429,7 +456,18 @@ const EventRegistrations = () => {
                   {/* Team Footer */}
                   <div className="pt-2 border-t border-gray-100 dark:border-gray-700">
                     <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-                      <span>{team.group}</span>
+                      <div className="flex items-center space-x-2">
+                        <span>{team.group}</span>
+                        {team.difficultyGrade && (
+                          <div className="flex items-center space-x-1">
+                            <div
+                              className="w-2 h-2 rounded-full border border-gray-400"
+                              style={{ backgroundColor: getDifficultyGradeColor(team.difficultyGrade) }}
+                            ></div>
+                            <span>{team.difficultyGrade}</span>
+                          </div>
+                        )}
+                      </div>
                       <span>{new Date(team.createdAt).toLocaleDateString('zh-CN')}</span>
                     </div>
                     {team.inviteCode && (

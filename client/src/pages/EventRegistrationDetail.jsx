@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useConfiguration } from '../context/ConfigurationContext';
 import axios from '../config/axiosConfig';
 import { toast } from 'sonner';
 import { ArrowLeft, Users, Clock, MapPin, Calendar, Copy, Check, GripVertical } from 'lucide-react';
@@ -17,12 +18,14 @@ const EventRegistrationDetail = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { isDarkMode } = useTheme();
+  const { difficultyGrades } = useConfiguration();
   const confirm = useConfirmDialog();
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [selectedGameTypes, setSelectedGameTypes] = useState([]);
   const [selectedGroups, setSelectedGroups] = useState({});
+  const [selectedDifficultyGrades, setSelectedDifficultyGrades] = useState({});
   const [teamNames, setTeamNames] = useState({});
   const [relayTeams, setRelayTeams] = useState({});
   const [relayTeamIds, setRelayTeamIds] = useState([]);
@@ -155,6 +158,7 @@ const EventRegistrationDetail = () => {
 
           const gameTypeSelections = [];
           const groupSelections = {};
+          const difficultyGradeSelections = {};
           const teamNameData = {};
           const teamData = {};
           const teamIdData = {};
@@ -176,6 +180,11 @@ const EventRegistrationDetail = () => {
             if (gt.group) {
               console.log(`Setting group for ${gt.name}: ${gt.group}`);
               groupSelections[gt.name] = gt.group;
+            }
+
+            if (gt.difficultyGrade) {
+              console.log(`Setting difficulty grade for ${gt.name}: ${gt.difficultyGrade}`);
+              difficultyGradeSelections[gt.name] = gt.difficultyGrade;
             }
             
             // Extract team name for team games
@@ -242,6 +251,7 @@ const EventRegistrationDetail = () => {
 
           setSelectedGameTypes(gameTypeSelections);
           setSelectedGroups(groupSelections);
+          setSelectedDifficultyGrades(difficultyGradeSelections);
           setTeamNames(teamNameData);
           setRelayTeams(teamData);
           setRelayTeamIds(teamIdData);
@@ -332,6 +342,18 @@ const EventRegistrationDetail = () => {
     // For team games (relay and team), synchronize group changes across all team members
     if (isEditMode && (gameTypeName.includes('接力') || gameTypeName === '团队赛')) {
       await synchronizeTeamData(gameTypeName, { group: groupCode });
+    }
+  };
+
+  const handleDifficultyGradeChange = async (gameTypeName, difficultyGrade) => {
+    setSelectedDifficultyGrades(prev => ({
+      ...prev,
+      [gameTypeName]: difficultyGrade
+    }));
+
+    // For team games (relay and team), synchronize difficulty grade changes across all team members
+    if (isEditMode && (gameTypeName.includes('接力') || gameTypeName === '团队赛')) {
+      await synchronizeTeamData(gameTypeName, { difficultyGrade });
     }
   };
 
@@ -506,7 +528,8 @@ const EventRegistrationDetail = () => {
       const gameTypes = selectedGameTypes.map(gameTypeName => {
         const gameTypeObj = {
           name: gameTypeName,
-          group: selectedGroups[gameTypeName]
+          group: selectedGroups[gameTypeName],
+          difficultyGrade: selectedDifficultyGrades[gameTypeName] || ''
         };
 
         // 如果是接力赛，添加team结构
@@ -690,7 +713,8 @@ const EventRegistrationDetail = () => {
       const updatedGameTypes = selectedGameTypes.map(selectedGameType => {
         const gameTypeObj = {
           name: selectedGameType,
-          group: selectedGroups[selectedGameType]
+          group: selectedGroups[selectedGameType],
+          difficultyGrade: selectedDifficultyGrades[selectedGameType] || ''
         };
 
         if (selectedGameType === gameTypeName) {
@@ -1114,6 +1138,46 @@ const EventRegistrationDetail = () => {
                             <p className={`text-xs text-blue-600 dark:text-blue-400 mt-1`}>
                               正在同步团队数据...
                             </p>
+                          )}
+                        </div>
+
+                        {/* Difficulty Grade Selection */}
+                        <div>
+                          <label className={`block text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                            难度等级
+                          </label>
+                          <div className="relative">
+                            <select
+                              value={selectedDifficultyGrades[gameTypeName] || ''}
+                              onChange={(e) => handleDifficultyGradeChange(gameTypeName, e.target.value)}
+                              disabled={syncingTeamData}
+                              className={`w-full px-3 py-2 border ${isDarkMode ? 'border-gray-600 bg-gray-700 text-gray-100' : 'border-gray-300 bg-white text-gray-900'} rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${syncingTeamData ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            >
+                              <option value="">请选择难度等级</option>
+                              {difficultyGrades.map((grade, gradeIndex) => (
+                                <option key={gradeIndex} value={grade.color}>
+                                  {grade.color} - {grade.level} (等级 {grade.number})
+                                </option>
+                              ))}
+                            </select>
+                            {syncingTeamData && (
+                              <div className="absolute inset-y-0 right-8 flex items-center">
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                              </div>
+                            )}
+                          </div>
+                          {selectedDifficultyGrades[gameTypeName] && (
+                            <div className="flex items-center mt-2">
+                              <div
+                                className="w-4 h-4 rounded-full border border-gray-300 mr-2"
+                                style={{ 
+                                  backgroundColor: difficultyGrades.find(g => g.color === selectedDifficultyGrades[gameTypeName])?.colorCode || '#000000'
+                                }}
+                              ></div>
+                              <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                已选择: {selectedDifficultyGrades[gameTypeName]}
+                              </p>
+                            </div>
                           )}
                         </div>
 

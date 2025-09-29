@@ -1160,7 +1160,11 @@ const UserProfile = () => {
                             </div>
                             <div className="flex items-center space-x-2">
                               <Trophy className="h-4 w-4" />
-                              <span>报名项目: {registration.gameTypes?.map(gt => typeof gt === 'string' ? gt : gt.name).join(', ') || '无'}</span>
+                              <span>报名项目: {registration.gameTypes?.map(gt => {
+                                const name = typeof gt === 'string' ? gt : gt.name;
+                                const difficultyGrade = typeof gt === 'object' && gt.difficultyGrade ? ` (${gt.difficultyGrade})` : '';
+                                return name + difficultyGrade;
+                              }).join(', ') || '无'}</span>
                             </div>
                             <div className="flex items-center space-x-2">
                               <Clock className="h-4 w-4" />
