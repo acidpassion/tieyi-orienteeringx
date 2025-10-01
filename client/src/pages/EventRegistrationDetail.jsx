@@ -5,12 +5,13 @@ import { useTheme } from '../context/ThemeContext';
 import { useConfiguration } from '../context/ConfigurationContext';
 import axios from '../config/axiosConfig';
 import { toast } from 'sonner';
-import { ArrowLeft, Users, Clock, MapPin, Calendar, Copy, Check, GripVertical } from 'lucide-react';
+import { ArrowLeft, Users, Clock, MapPin, Calendar, Copy, Check, GripVertical, Upload } from 'lucide-react';
 import { createApiUrl } from '../config/api';
 import AutocompleteInput from '../components/AutocompleteInput';
 import Avatar from '../components/Avatar';
 import TeamMemberCard from '../components/TeamMemberCard';
 import RemoveMemberModal from '../components/RemoveMemberModal';
+import FileUpload from '../components/FileUpload';
 import { useConfirmDialog } from '../hooks/useConfirmDialog';
 
 const EventRegistrationDetail = () => {
@@ -40,6 +41,8 @@ const EventRegistrationDetail = () => {
   const [draggedMember, setDraggedMember] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
   const [syncingTeamData, setSyncingTeamData] = useState(false);
+  const [documents, setDocuments] = useState([]);
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
 
 
   useEffect(() => {
@@ -116,6 +119,27 @@ const EventRegistrationDetail = () => {
     }
   };
 
+  const fetchDocuments = async (registrationId) => {
+    if (!registrationId) return;
+    
+    setLoadingDocuments(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(
+        createApiUrl(`/api/documents/registration/${registrationId}`),
+        {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }
+      );
+      setDocuments(response.data.documents || []);
+    } catch (error) {
+      console.error('获取文件列表失败:', error);
+      setDocuments([]);
+    } finally {
+      setLoadingDocuments(false);
+    }
+  };
+
   const fetchExistingRegistration = async () => {
     try {
       // Ensure event data is available before processing
@@ -152,6 +176,9 @@ const EventRegistrationDetail = () => {
       if (existingReg) {
         setExistingRegistration(existingReg);
         setIsEditMode(true);
+        
+        // Fetch documents for existing registration
+        fetchDocuments(existingReg._id);
 
         // 预填充表单数据
         if (existingReg && existingReg.gameTypes && Array.isArray(existingReg.gameTypes) && existingReg.gameTypes.length > 0) {
@@ -615,6 +642,14 @@ const EventRegistrationDetail = () => {
 
       if (response.status === 201 || response.status === 200) {
         const registrationData = response.data;
+
+        // Update state for new registration
+        if (!isEditMode) {
+          setExistingRegistration(registrationData);
+          setIsEditMode(true);
+          // Fetch documents for the new registration
+          fetchDocuments(registrationData._id);
+        }
 
         // 检查是否有接力赛或团队赛项目，如果有则生成分享链接
         const hasRelayGame = selectedGameTypes.some(gameType => gameType.includes('接力') || gameType === '团队赛');
@@ -1559,6 +1594,37 @@ const EventRegistrationDetail = () => {
                 );
               })}
             </div>
+          </div>
+
+          {/* File Upload Section */}
+          <div className={`${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg p-6 mb-6`}>
+            <div className="flex items-center mb-4">
+              <Upload className="h-5 w-5 text-blue-600 mr-2" />
+              <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                上传相关文件
+              </h3>
+            </div>
+            <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'} mb-4`}>
+              请上传保险单据和责任告知书等相关文件
+            </p>
+            
+            {!existingRegistration ? (
+              <div className={`text-center py-8 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                <Upload className="mx-auto h-12 w-12 mb-4 opacity-50" />
+                <p>请先完成报名，然后即可上传相关文件</p>
+              </div>
+            ) : loadingDocuments ? (
+              <div className="flex justify-center items-center h-32">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              </div>
+            ) : (
+              <FileUpload
+                registrationId={existingRegistration._id}
+                existingDocuments={documents}
+                onUploadSuccess={() => fetchDocuments(existingRegistration._id)}
+                confirmDialog={confirm}
+              />
+            )}
           </div>
 
           {/* Submit Button */}

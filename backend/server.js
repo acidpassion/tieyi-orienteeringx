@@ -19,6 +19,7 @@ const eventRoutes = require('./routes/events');
 const registrationRoutes = require('./routes/registrations');
 const relayTeamRoutes = require('./routes/relayTeams');
 const configurationRoutes = require('./routes/configurations');
+const documentRoutes = require('./routes/documents');
 
 const app = express();
 
@@ -52,6 +53,7 @@ app.use('/api/events', eventRoutes);
 app.use('/api/registrations', registrationRoutes);
 app.use('/api/relay-teams', relayTeamRoutes);
 app.use('/api/configurations', configurationRoutes);
+app.use('/api/documents', documentRoutes);
 
 // 404 handler
 app.use('*', handle404);

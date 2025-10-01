@@ -102,6 +102,22 @@ const eventRegistrationSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
+  documents: [{
+    documentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Document',
+      required: true
+    },
+    description: {
+      type: String,
+      maxlength: 200,
+      default: ''
+    },
+    uploadedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }]
 
 }, {
   timestamps: true
