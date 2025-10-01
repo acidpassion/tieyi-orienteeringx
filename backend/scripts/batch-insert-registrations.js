@@ -24,7 +24,8 @@ const teamCombinations = [
   '谭语晴+孙雯汐',
   '盘子宽+王鹏扬', // Fixed the character
   '廖思诚+卢钊浩',
-  '徐嘉泽+叶怀逊'
+  '徐嘉泽+叶怀逊',
+  '肖奇+邱炜晴'
 ];
 
 const eventId = '68d9056cb59c12d4df95aa5a';
@@ -128,12 +129,14 @@ async function createRegistrations() {
             // 短距离 - individual registration
             {
               name: '短距离',
-              group: '专业组'
+              group: '专业组',
+              difficultyGrade:'黑色'
             },
             // 接力赛 - team registration
             {
               name: '接力赛',
               group: '专业组',
+              difficultyGrade:'黑色',
               team: {
                 name: teamName,
                 members: teamMembers

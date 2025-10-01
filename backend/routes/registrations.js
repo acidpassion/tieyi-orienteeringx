@@ -1403,7 +1403,7 @@ router.get('/event/:eventId/export', verifyToken, verifyCoach, async (req, res) 
 
     // Set up the header section (rows 1-6)
     worksheet.mergeCells('A1:M1');
-    worksheet.getCell('A1').value = `"喜迎十五运" 广东省第十九届定向锦标赛报名表`;
+    worksheet.getCell('A1').value = `${event.eventName} 报名表`;
     worksheet.getCell('A1').font = { size: 16, bold: true };
     worksheet.getCell('A1').alignment = { horizontal: 'center' };
 
@@ -1504,9 +1504,39 @@ router.get('/event/:eventId/export', verifyToken, verifyCoach, async (req, res) 
     let currentRow = 8;
     let sequenceNumber = 1;
 
+    // Function to generate distinct colors for groups with better contrast
+    const generateGroupColor = (index, total, isRelay = false) => {
+      const relayColors = [
+        'FFCCE5FF', // Light blue
+        'FFFFCCCC', // Light red
+        'FFCCFFCC', // Light green
+        'FFFFCCFF', // Light magenta
+        'FFCCCCFF', // Light purple
+        'FFFFFF99', // Light yellow
+        'FFCCFFFF', // Light cyan
+        'FFFFCC99'  // Light orange
+      ];
+      
+      const individualColors = [
+        'FFE6FFE6', // Light green
+        'FFFFE6CC', // Light peach
+        'FFCCE6FF', // Light blue
+        'FFFFE6E6', // Light pink
+        'FFE6CCFF', // Light purple
+        'FFFFFFE6', // Light yellow
+        'FFE6FFFF', // Light cyan
+        'FFFFE6FF'  // Light magenta
+      ];
+      
+      const colors = isRelay ? relayColors : individualColors;
+      return colors[index % colors.length];
+    };
+
     // Add relay teams first
     const relayTeams = Array.from(relayTeamsMap.values());
-    relayTeams.forEach(team => {
+    relayTeams.forEach((team, teamIndex) => {
+      const teamColor = generateGroupColor(teamIndex, relayTeams.length, true);
+      
       team.members.forEach((member, index) => {
         if (member.student) {
           const student = member.student;
@@ -1547,6 +1577,15 @@ router.get('/event/:eventId/export', verifyToken, verifyCoach, async (req, res) 
           worksheet.getCell(`L${currentRow}`).value = relayGroupText;
           worksheet.getCell(`M${currentRow}`).value = member.runOrder;
 
+          // Apply gradient color to the entire row for this relay team
+          for (let col = 1; col <= 13; col++) {
+            worksheet.getCell(currentRow, col).fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: teamColor }
+            };
+          }
+
           currentRow++;
         }
       });
@@ -1580,37 +1619,63 @@ router.get('/event/:eventId/export', verifyToken, verifyCoach, async (req, res) 
       individualOnlyByStudent.get(studentId).gameTypes.push(reg);
     });
 
-    // Add individual-only students
+    // Group individual-only students by their group for gradient coloring
+    const individualGroupsMap = new Map();
     individualOnlyByStudent.forEach(studentData => {
-      const student = studentData.student;
-      worksheet.getCell(`A${currentRow}`).value = sequenceNumber;
-      worksheet.getCell(`B${currentRow}`).value = ''; // CH卡号 - blank
-      worksheet.getCell(`C${currentRow}`).value = student.name || '';
-      worksheet.getCell(`D${currentRow}`).value = ''; // 身份证号 - blank
-      worksheet.getCell(`E${currentRow}`).value = student.gender || '';
-      worksheet.getCell(`F${currentRow}`).value = student.birthday ?
-        student.birthday.toLocaleDateString('zh-CN') : '';
-      worksheet.getCell(`G${currentRow}`).value = ''; // 年龄 - blank
-
-      // Individual events - set group with difficulty grade and mark game types with √
       if (studentData.gameTypes.length > 0) {
-        const groupText = studentData.gameTypes[0].group +
+        const groupKey = studentData.gameTypes[0].group + 
           (studentData.gameTypes[0].difficultyGrade ? `-${studentData.gameTypes[0].difficultyGrade}` : '');
-        worksheet.getCell(`H${currentRow}`).value = groupText;
-
-        studentData.gameTypes.forEach(reg => {
-          if (reg.gameType === '短距离') {
-            worksheet.getCell(`I${currentRow}`).value = '√';
-          } else if (reg.gameType === '积分') {
-            worksheet.getCell(`J${currentRow}`).value = '√';
-          } else if (reg.gameType === '百米') {
-            worksheet.getCell(`K${currentRow}`).value = '√';
-          }
-        });
+        
+        if (!individualGroupsMap.has(groupKey)) {
+          individualGroupsMap.set(groupKey, []);
+        }
+        individualGroupsMap.get(groupKey).push(studentData);
       }
+    });
 
-      currentRow++;
-      sequenceNumber++;
+    // Add individual-only students with gradient colors by group
+    const individualGroups = Array.from(individualGroupsMap.entries());
+    individualGroups.forEach(([groupKey, students], groupIndex) => {
+      const groupColor = generateGroupColor(groupIndex, individualGroups.length, false);
+      
+      students.forEach(studentData => {
+        const student = studentData.student;
+        worksheet.getCell(`A${currentRow}`).value = sequenceNumber;
+        worksheet.getCell(`B${currentRow}`).value = ''; // CH卡号 - blank
+        worksheet.getCell(`C${currentRow}`).value = student.name || '';
+        worksheet.getCell(`D${currentRow}`).value = ''; // 身份证号 - blank
+        worksheet.getCell(`E${currentRow}`).value = student.gender || '';
+        worksheet.getCell(`F${currentRow}`).value = student.birthday ?
+          student.birthday.toLocaleDateString('zh-CN') : '';
+        worksheet.getCell(`G${currentRow}`).value = ''; // 年龄 - blank
+
+        // Individual events - set group with difficulty grade and mark game types with √
+        if (studentData.gameTypes.length > 0) {
+          worksheet.getCell(`H${currentRow}`).value = groupKey;
+
+          studentData.gameTypes.forEach(reg => {
+            if (reg.gameType === '短距离') {
+              worksheet.getCell(`I${currentRow}`).value = '√';
+            } else if (reg.gameType === '积分') {
+              worksheet.getCell(`J${currentRow}`).value = '√';
+            } else if (reg.gameType === '百米') {
+              worksheet.getCell(`K${currentRow}`).value = '√';
+            }
+          });
+        }
+
+        // Apply gradient color to the entire row for this individual group
+        for (let col = 1; col <= 13; col++) {
+          worksheet.getCell(currentRow, col).fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: groupColor }
+          };
+        }
+
+        currentRow++;
+        sequenceNumber++;
+      });
     });
 
     // Style the worksheet
