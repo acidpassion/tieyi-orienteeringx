@@ -1,0 +1,30 @@
+/* Mobile drag and drop styles */
+.touch-action-none {
+  touch-action: none;
+}
+
+.dragging-mobile {
+  transform: scale(1.05);
+  opacity: 0.8;
+  z-index: 1000;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+@media (max-width: 640px) {
+  .drag-handle-mobile {
+    padding: 8px;
+    margin: -4px;
+  }
+}
+
+/* Smooth transitions for drag operations */
+.drag-transition {
+  transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Drag over indicator */
+.drag-over {
+  background-color: rgba(59, 130, 246, 0.1);
+  border: 2px dashed rgba(59, 130, 246, 0.5);
+  transform: scale(1.02);
+}

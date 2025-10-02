@@ -13,6 +13,7 @@ import TeamMemberCard from '../components/TeamMemberCard';
 import RemoveMemberModal from '../components/RemoveMemberModal';
 import FileUpload from '../components/FileUpload';
 import { useConfirmDialog } from '../hooks/useConfirmDialog';
+import '../styles/dragAndDrop.css';
 
 const EventRegistrationDetail = () => {
   const { id } = useParams();
@@ -41,6 +42,9 @@ const EventRegistrationDetail = () => {
   const [draggedMember, setDraggedMember] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
   const [syncingTeamData, setSyncingTeamData] = useState(false);
+  const [touchStartY, setTouchStartY] = useState(null);
+  const [touchCurrentY, setTouchCurrentY] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
   const [documents, setDocuments] = useState([]);
   const [loadingDocuments, setLoadingDocuments] = useState(false);
 
@@ -366,9 +370,44 @@ const EventRegistrationDetail = () => {
       [gameTypeName]: groupCode
     }));
 
-    // For team games (relay and team), synchronize group changes across all team members
-    if (isEditMode && (gameTypeName.includes('接力') || gameTypeName === '团队赛')) {
-      await synchronizeTeamData(gameTypeName, { group: groupCode });
+    // If in edit mode, save the change immediately to prevent data loss
+    if (isEditMode && existingRegistration) {
+      try {
+        // Build updated game types with current local state
+        const updatedGameTypes = existingRegistration.gameTypes.map(existingGT => {
+          return {
+            ...existingGT,
+            // Update with current local state
+            group: existingGT.name === gameTypeName ? groupCode : (selectedGroups[existingGT.name] || existingGT.group),
+            difficultyGrade: selectedDifficultyGrades[existingGT.name] || existingGT.difficultyGrade || '',
+            ...(existingGT.team && {
+              team: {
+                ...existingGT.team,
+                name: teamNames[existingGT.name] || existingGT.team?.name
+              }
+            })
+          };
+        });
+
+        const registrationData = {
+          eventId: id,
+          gameTypes: updatedGameTypes
+        };
+
+        // Save to backend immediately
+        await axios.put(createApiUrl(`/api/registrations/${existingRegistration._id}`), registrationData);
+
+        // For team games (relay and team), also synchronize across all team members
+        if (gameTypeName.includes('接力') || gameTypeName === '团队赛') {
+          await synchronizeTeamData(gameTypeName, { group: groupCode });
+        } else {
+          // For non-team games, just refresh to get the updated data
+          await fetchExistingRegistration();
+        }
+      } catch (error) {
+        console.error('保存组别失败:', error);
+        toast.error('保存组别失败，请重试');
+      }
     }
   };
 
@@ -378,9 +417,44 @@ const EventRegistrationDetail = () => {
       [gameTypeName]: difficultyGrade
     }));
 
-    // For team games (relay and team), synchronize difficulty grade changes across all team members
-    if (isEditMode && (gameTypeName.includes('接力') || gameTypeName === '团队赛')) {
-      await synchronizeTeamData(gameTypeName, { difficultyGrade });
+    // If in edit mode, save the change immediately to prevent data loss
+    if (isEditMode && existingRegistration) {
+      try {
+        // Build updated game types with current local state
+        const updatedGameTypes = existingRegistration.gameTypes.map(existingGT => {
+          return {
+            ...existingGT,
+            // Update with current local state
+            group: selectedGroups[existingGT.name] || existingGT.group,
+            difficultyGrade: existingGT.name === gameTypeName ? difficultyGrade : (selectedDifficultyGrades[existingGT.name] || existingGT.difficultyGrade || ''),
+            ...(existingGT.team && {
+              team: {
+                ...existingGT.team,
+                name: teamNames[existingGT.name] || existingGT.team?.name
+              }
+            })
+          };
+        });
+
+        const registrationData = {
+          eventId: id,
+          gameTypes: updatedGameTypes
+        };
+
+        // Save to backend immediately
+        await axios.put(createApiUrl(`/api/registrations/${existingRegistration._id}`), registrationData);
+
+        // For team games (relay and team), also synchronize across all team members
+        if (gameTypeName.includes('接力') || gameTypeName === '团队赛') {
+          await synchronizeTeamData(gameTypeName, { difficultyGrade });
+        } else {
+          // For non-team games, just refresh to get the updated data
+          await fetchExistingRegistration();
+        }
+      } catch (error) {
+        console.error('保存难度等级失败:', error);
+        toast.error('保存难度等级失败，请重试');
+      }
     }
   };
 
@@ -904,6 +978,55 @@ const EventRegistrationDetail = () => {
     setDragOverIndex(null);
   };
 
+  // Touch event handlers for mobile drag and drop
+  const handleTouchStart = (e, member, index) => {
+    const touch = e.touches[0];
+    setTouchStartY(touch.clientY);
+    setTouchCurrentY(touch.clientY);
+    setDraggedMember({ member, index });
+    setIsDragging(true);
+    e.preventDefault();
+  };
+
+  const handleTouchMove = (e) => {
+    if (!isDragging || !draggedMember) return;
+    
+    const touch = e.touches[0];
+    setTouchCurrentY(touch.clientY);
+    
+    // Find the element under the touch point
+    const elementBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+    const memberCard = elementBelow?.closest('[data-member-index]');
+    
+    if (memberCard) {
+      const newIndex = parseInt(memberCard.getAttribute('data-member-index'));
+      if (newIndex !== dragOverIndex) {
+        setDragOverIndex(newIndex);
+      }
+    }
+    
+    e.preventDefault();
+  };
+
+  const handleTouchEnd = async (e, gameTypeName) => {
+    if (!isDragging || !draggedMember || dragOverIndex === null) {
+      setIsDragging(false);
+      setDraggedMember(null);
+      setDragOverIndex(null);
+      setTouchStartY(null);
+      setTouchCurrentY(null);
+      return;
+    }
+
+    // Perform the drop operation
+    await handleDrop(e, dragOverIndex, gameTypeName);
+    
+    // Reset touch states
+    setIsDragging(false);
+    setTouchStartY(null);
+    setTouchCurrentY(null);
+  };
+
   const handleDrop = async (e, dropIndex, gameTypeName) => {
     e.preventDefault();
     setDragOverIndex(null);
@@ -930,23 +1053,32 @@ const EventRegistrationDetail = () => {
         ...(gameTypeName.includes('接力') && { runOrder: index + 1 })
       }));
 
-      // Build complete game types array including all existing registrations
+      // Build complete game types array including all existing registrations AND current local state
       const updatedGameTypes = existingRegistration.gameTypes.map(existingGT => {
         if (existingGT.name === gameTypeName) {
           return {
-            name: gameTypeName,
-            group: existingGT.group,
+            ...existingGT, // Preserve all existing fields
+            // Update with current local state if available
+            group: selectedGroups[existingGT.name] || existingGT.group,
+            difficultyGrade: selectedDifficultyGrades[existingGT.name] || existingGT.difficultyGrade || '',
             team: {
               ...existingGT.team,
+              name: teamNames[existingGT.name] || existingGT.team?.name,
               members: updatedMembers
             }
           };
         } else {
           return {
-            name: existingGT.name,
-            group: existingGT.group,
-            ...(existingGT.team && { team: existingGT.team }),
-            ...(existingGT.members && { members: existingGT.members })
+            ...existingGT, // Preserve all existing fields for other game types
+            // Update with current local state if available
+            group: selectedGroups[existingGT.name] || existingGT.group,
+            difficultyGrade: selectedDifficultyGrades[existingGT.name] || existingGT.difficultyGrade || '',
+            ...(existingGT.team && {
+              team: {
+                ...existingGT.team,
+                name: teamNames[existingGT.name] || existingGT.team?.name
+              }
+            })
           };
         }
       });
@@ -1050,9 +1182,9 @@ const EventRegistrationDetail = () => {
 
   return (
     <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+      <div className="max-w-4xl mx-auto px-2 sm:px-6 lg:px-8 py-2 sm:py-8">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
           <button
             onClick={() => navigate('/events/register')}
             className={`flex items-center self-start ${isDarkMode ? 'text-gray-300 hover:text-gray-100' : 'text-gray-600 hover:text-gray-800'}`}
@@ -1073,7 +1205,7 @@ const EventRegistrationDetail = () => {
         </div>
 
         {/* Event Info */}
-        <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-sm p-4 sm:p-6 mb-6`}>
+        <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-sm p-3 sm:p-6 mb-4 sm:mb-6`}>
           <h1 className={`text-xl sm:text-2xl font-bold ${isDarkMode ? 'text-gray-100' : 'text-gray-900'} mb-4 break-words`}>
             {event.eventName}
           </h1>
@@ -1103,7 +1235,7 @@ const EventRegistrationDetail = () => {
 
 
         {/* Registration Form */}
-        <form onSubmit={handleSubmit} className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-sm p-4 sm:p-6`}>
+        <form onSubmit={handleSubmit} className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-sm p-3 sm:p-6`}>
           <RemoveMemberModal
             isOpen={removeMemberModal.isOpen}
             onClose={() => setRemoveMemberModal({ isOpen: false, member: null, gameType: null })}
@@ -1337,16 +1469,20 @@ const EventRegistrationDetail = () => {
                                         >
                                           <div
                                             draggable={isDraggable}
+                                            data-member-index={memberIndex}
                                             onDragStart={(e) => isDraggable && handleDragStart(e, memberData, memberIndex)}
                                             onDragOver={(e) => isDraggable && handleDragOver(e, memberIndex)}
                                             onDragLeave={handleDragLeave}
                                             onDrop={(e) => isDraggable && handleDrop(e, memberIndex, gameTypeName)}
-                                            className={`flex items-center gap-2 ${isDraggable ? 'cursor-move hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg p-1' : ''
-                                              }`}
+                                            onTouchStart={(e) => isDraggable && handleTouchStart(e, memberData, memberIndex)}
+                                            onTouchMove={(e) => isDraggable && handleTouchMove(e)}
+                                            onTouchEnd={(e) => isDraggable && handleTouchEnd(e, gameTypeName)}
+                                            className={`flex items-center gap-2 drag-transition ${isDraggable ? 'cursor-move hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg p-1 touch-action-none' : ''
+                                              } ${isDragging && draggedMember?.index === memberIndex ? 'dragging-mobile' : ''} ${isDragOver ? 'drag-over' : ''}`}
                                           >
                                             {isDraggable && (
-                                              <div className="flex-shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-                                                <GripVertical className="h-4 w-4" />
+                                              <div className="flex-shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 drag-handle-mobile">
+                                                <GripVertical className="h-5 w-5 sm:h-4 sm:w-4" />
                                               </div>
                                             )}
                                             <div className="flex-1">
@@ -1469,20 +1605,27 @@ const EventRegistrationDetail = () => {
                                                     if (existingGT.name === gameTypeName) {
                                                       // Update the current game type with new team member
                                                       return {
-                                                        name: gameTypeName,
+                                                        ...existingGT, // Preserve all existing fields
                                                         group: selectedGroups[gameTypeName] || existingGT.group,
+                                                        difficultyGrade: selectedDifficultyGrades[gameTypeName] || existingGT.difficultyGrade || '',
                                                         team: {
-                                                          name: `${gameTypeName}队伍`,
+                                                          ...existingGT.team, // Preserve existing team data
+                                                          name: teamNames[gameTypeName] || existingGT.team?.name || `${gameTypeName}队伍`,
                                                           members: allMembers
                                                         }
                                                       };
                                                     } else {
-                                                      // Keep other game types unchanged
+                                                      // Keep other game types unchanged but update with current local state
                                                       return {
-                                                        name: existingGT.name,
-                                                        group: existingGT.group,
-                                                        ...(existingGT.team && { team: existingGT.team }),
-                                                        ...(existingGT.members && { members: existingGT.members })
+                                                        ...existingGT, // Preserve all existing fields
+                                                        group: selectedGroups[existingGT.name] || existingGT.group,
+                                                        difficultyGrade: selectedDifficultyGrades[existingGT.name] || existingGT.difficultyGrade || '',
+                                                        ...(existingGT.team && {
+                                                          team: {
+                                                            ...existingGT.team,
+                                                            name: teamNames[existingGT.name] || existingGT.team?.name
+                                                          }
+                                                        })
                                                       };
                                                     }
                                                   });
@@ -1597,7 +1740,7 @@ const EventRegistrationDetail = () => {
           </div>
 
           {/* File Upload Section */}
-          <div className={`${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg p-6 mb-6`}>
+          <div className={`${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg p-3 sm:p-6 mb-4 sm:mb-6`}>
             <div className="flex items-center mb-4">
               <Upload className="h-5 w-5 text-blue-600 mr-2" />
               <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>

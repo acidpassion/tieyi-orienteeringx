@@ -2527,6 +2527,7 @@ router.post('/sync-team', verifyToken, verifyCoachOrStudent, async (req, res) =>
             gameTypes: [{
               name: gameTypeName,
               group: gameType.group,
+              difficultyGrade: gameType.difficultyGrade || '',
               team: {
                 ...gameType.team,
                 // Apply team name update if provided
@@ -2559,8 +2560,17 @@ router.post('/sync-team', verifyToken, verifyCoachOrStudent, async (req, res) =>
       if (gameTypeIndex !== -1) {
         console.log(`Updating registration for ${registration.studentId.name}`);
 
-        // Apply updates (e.g., group change, team name change)
-        Object.assign(registration.gameTypes[gameTypeIndex], updates);
+        // Apply updates (e.g., group change, difficulty grade change, team name change)
+        // Be explicit about which fields to update to avoid overwriting other fields
+        if (updates.group !== undefined) {
+          registration.gameTypes[gameTypeIndex].group = updates.group;
+        }
+        if (updates.difficultyGrade !== undefined) {
+          registration.gameTypes[gameTypeIndex].difficultyGrade = updates.difficultyGrade;
+        }
+        if (updates.teamName !== undefined && registration.gameTypes[gameTypeIndex].team) {
+          registration.gameTypes[gameTypeIndex].team.name = updates.teamName;
+        }
 
         // Ensure team data consistency - use the initiator's team data as the source of truth
         registration.gameTypes[gameTypeIndex].team = {

@@ -2121,3 +2121,7 @@
 {"timestamp":"2025-10-01 10:01:55","level":"info","message":"HTTP Request","requestId":"40434d7a-423a-435c-8bb0-579f5a10e06b","method":"GET","url":"/api/assignments/student","statusCode":304,"responseTime":10,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36","ip":"::1"}
 {"timestamp":"2025-10-01 10:44:53","level":"info","message":"Server started successfully","port":"5001","environment":"development","swaggerDocs":"http://localhost:5001/api-docs"}
 {"timestamp":"2025-10-01 10:44:53","level":"info","message":"MongoDB connected successfully","database":"orienteeringx"}
+{"timestamp":"2025-10-01 23:56:28","level":"info","message":"Server started successfully","port":"5001","environment":"development","swaggerDocs":"http://localhost:5001/api-docs"}
+{"timestamp":"2025-10-01 23:56:28","level":"info","message":"MongoDB connected successfully","database":"orienteeringx"}
+{"timestamp":"2025-10-01 23:56:35","level":"info","message":"Server started successfully","port":"5001","environment":"development","swaggerDocs":"http://localhost:5001/api-docs"}
+{"timestamp":"2025-10-01 23:56:36","level":"info","message":"MongoDB connected successfully","database":"orienteeringx"}

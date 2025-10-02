@@ -10,6 +10,19 @@ const FileUpload = ({ registrationId, onUploadSuccess, existingDocuments = [], m
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef(null);
 
+  // Test function to trigger file input
+  const triggerFileInput = () => {
+    console.log('triggerFileInput called');
+    console.log('fileInputRef.current:', fileInputRef.current);
+    if (fileInputRef.current) {
+      console.log('About to click file input');
+      fileInputRef.current.click();
+      console.log('File input click triggered');
+    } else {
+      console.error('File input ref is null');
+    }
+  };
+
   const allowedTypes = [
     'image/jpeg',
     'image/png', 
@@ -52,7 +65,28 @@ const FileUpload = ({ registrationId, onUploadSuccess, existingDocuments = [], m
   };
 
   const handleFileSelect = (selectedFiles) => {
-    const validFiles = Array.from(selectedFiles).filter(validateFile);
+    console.log('handleFileSelect called with:', selectedFiles);
+    
+    // Handle null/undefined selectedFiles (common on mobile)
+    if (!selectedFiles || selectedFiles.length === 0) {
+      console.log('No files selected or empty FileList');
+      return;
+    }
+
+    // Convert FileList to Array safely
+    let filesArray;
+    try {
+      filesArray = Array.from(selectedFiles);
+    } catch (error) {
+      console.error('Error converting FileList to Array:', error);
+      // Fallback for older browsers or mobile issues
+      filesArray = [];
+      for (let i = 0; i < selectedFiles.length; i++) {
+        filesArray.push(selectedFiles[i]);
+      }
+    }
+
+    const validFiles = filesArray.filter(validateFile);
     
     if (files.length + validFiles.length + existingDocuments.length > maxFiles) {
       toast.error(`最多只能上传 ${maxFiles} 个文件`);
@@ -65,6 +99,7 @@ const FileUpload = ({ registrationId, onUploadSuccess, existingDocuments = [], m
       description: ''
     }));
 
+    console.log('Adding new files to state:', newFiles);
     setFiles(prev => [...prev, ...newFiles]);
   };
 
@@ -248,37 +283,72 @@ const FileUpload = ({ registrationId, onUploadSuccess, existingDocuments = [], m
     }
   };
 
+  console.log('FileUpload component rendering, fileInputRef:', fileInputRef);
+
   return (
     <div className="space-y-4">
       {/* Upload Area */}
-      <div
-        className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-          dragOver 
-            ? 'border-blue-500 bg-blue-50' 
-            : 'border-gray-300 hover:border-gray-400'
-        }`}
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onClick={() => fileInputRef.current?.click()}
-      >
-        <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-        <p className="text-lg font-medium text-gray-900 mb-2">
-          拖拽文件到此处或点击选择文件
-        </p>
-        <p className="text-sm text-gray-500 mb-4">
-          支持图片、PDF、Word文档，单个文件最大5MB，最多{maxFiles}个文件
-        </p>
-        <p className="text-xs text-gray-400">
-          支持格式: JPG, PNG, GIF, WebP, PDF, DOC, DOCX
-        </p>
+      <div className="space-y-4">
+        {/* Drag and Drop Zone */}
+        <div
+          className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+            dragOver 
+              ? 'border-blue-500 bg-blue-50' 
+              : 'border-gray-300 hover:border-gray-400'
+          }`}
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onClick={(e) => {
+            // Only trigger if clicking on the div itself, not child elements
+            if (e.target === e.currentTarget) {
+              e.preventDefault();
+              console.log('Drop zone clicked, triggering file input');
+              if (fileInputRef.current) {
+                fileInputRef.current.click();
+              }
+            }
+          }}
+          style={{ cursor: 'pointer' }}
+        >
+          <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+          <p className="text-lg font-medium text-gray-900 mb-2">
+            拖拽文件到此处或点击选择文件
+          </p>
+          <p className="text-sm text-gray-500 mb-4">
+            支持图片、PDF、Word文档，单个文件最大5MB，最多{maxFiles}个文件
+          </p>
+          <p className="text-xs text-gray-400">
+            支持格式: JPG, PNG, GIF, WebP, PDF, DOC, DOCX
+          </p>
+        </div>
+        
+        {/* File Selection Button */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Select files button clicked');
+            triggerFileInput();
+          }}
+          className="w-full flex items-center justify-center px-6 py-3 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+        >
+          <Upload className="w-4 h-4 mr-2" />
+          选择文件
+        </button>
         
         <input
           ref={fileInputRef}
           type="file"
           multiple
           accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx"
-          onChange={(e) => handleFileSelect(e.target.files)}
+          onChange={(e) => {
+            console.log('File input onChange triggered', e.target.files);
+            handleFileSelect(e.target.files);
+            // Reset the input value to allow selecting the same file again
+            e.target.value = '';
+          }}
           className="hidden"
         />
       </div>
