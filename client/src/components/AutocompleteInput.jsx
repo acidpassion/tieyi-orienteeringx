@@ -232,7 +232,7 @@ const AutocompleteInput = ({
                   )}
                   {hasRegistrationConflict && (
                     <div className="text-xs text-yellow-500 mt-1">
-                      ⚠️ 已注册其他游戏类型: {student.conflictInfo?.gameType}
+                      ⚠️ 已注册其他比赛类型: {student.conflictInfo?.gameType}
                     </div>
                   )}
                 </div>

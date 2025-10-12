@@ -525,7 +525,7 @@ const EventRegistrationDetail = () => {
     if (student.teamStatus && (student.teamStatus === 'in_relay_team' || student.teamStatus === 'registered_other_game')) {
       const conflictMessage = student.teamStatus === 'in_relay_team'
         ? `${student.name} 已经加入了其他接力团队`
-        : `${student.name} 已经注册了其他游戏类型`;
+        : `${student.name} 已经注册了其他比赛类型`;
 
       const shouldContinue = window.confirm(`${conflictMessage}，是否仍要添加到队伍中？`);
       if (!shouldContinue) {
@@ -827,7 +827,7 @@ const EventRegistrationDetail = () => {
         };
 
         if (selectedGameType === gameTypeName) {
-          // 为退出的游戏类型更新团队成员
+          // 为退出的比赛类型更新团队成员
           if (selectedGameType.includes('接力')) {
             if (filteredMembers.length > 0) {
               gameTypeObj.team = {
@@ -851,7 +851,7 @@ const EventRegistrationDetail = () => {
             }
           }
         } else {
-          // 为其他游戏类型保持原有团队数据
+          // 为其他比赛类型保持原有团队数据
           if (selectedGameType.includes('接力') || selectedGameType === '团队赛') {
             const teamMembers = relayTeamIds[selectedGameType] || [];
             const validMembers = teamMembers.filter(memberId => memberId && memberId.trim() !== '');

@@ -274,7 +274,7 @@ const CompetitionRecordForm = ({
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm sm:text-base"
               required
             >
-              <option value="">选择游戏类型</option>
+              <option value="">选择比赛类型</option>
               {safeGameTypes.map((type) => (
                 <option key={type} value={type}>
                   {type}

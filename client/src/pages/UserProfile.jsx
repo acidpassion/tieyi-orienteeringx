@@ -183,7 +183,7 @@ const UserProfile = () => {
   const handleShareRegistration = async (registration, gameType) => {
     try {
       if (!gameType.inviteCode) {
-        toast.error('该游戏类型没有邀请码，无法分享');
+        toast.error('该比赛类型没有邀请码，无法分享');
         return;
       }
       const shareUrl = `${window.location.origin}/join-relay/${gameType.inviteCode}`;
@@ -1098,6 +1098,7 @@ const UserProfile = () => {
               <CompletionRecordsTable
                 records={completionRecords}
                 onEdit={handleEditRecord}
+                events={events}
                 onDelete={handleDeleteRecord}
               />
             </div>

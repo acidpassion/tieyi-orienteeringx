@@ -7,7 +7,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:5001',
+        target: 'https://api.orienteeringx.cn',
         changeOrigin: true,
         secure: true,
         rewrite: (path) => path,

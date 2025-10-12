@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 
 import { useConfiguration } from '../../context/ConfigurationContext';
 import CompetitionRecordForm from '../../components/CompetitionRecordForm';
+import EventAutocompleteInput from '../../components/EventAutocompleteInput';
 
 const PerformanceManagement = () => {
   const navigate = useNavigate();
@@ -199,10 +200,16 @@ const PerformanceManagement = () => {
       
       if (response.ok) {
         const data = await response.json();
+        console.log('Events API response:', data); // Debug log
         if (data.success && Array.isArray(data.data)) {
+          console.log('Setting events from data.data:', data.data); // Debug log
           setEvents(data.data);
         } else if (Array.isArray(data)) {
+          console.log('Setting events from direct array:', data); // Debug log
           setEvents(data);
+        } else {
+          console.log('Unexpected events data structure:', data); // Debug log
+          setEvents([]);
         }
       }
     } catch (error) {
@@ -315,6 +322,54 @@ const PerformanceManagement = () => {
   const cancelDeleteRecord = () => {
     setShowDeleteConfirm(false);
     setRecordToDelete(null);
+  };
+
+  const handleExportData = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      // Build URL with current filters
+      const urlParams = new URLSearchParams();
+      
+      if (filters.studentName) urlParams.append('studentName', filters.studentName);
+      if (filters.eventName) urlParams.append('eventName', filters.eventName);
+      if (filters.gameType) urlParams.append('gameType', filters.gameType);
+      if (filters.startDate) urlParams.append('startDate', filters.startDate);
+      if (filters.endDate) urlParams.append('endDate', filters.endDate);
+      if (filters.validity) urlParams.append('validity', filters.validity);
+      
+      const exportUrl = `/api/completion-records/export?${urlParams.toString()}`;
+      
+      const response = await fetch(exportUrl, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to export data');
+      }
+      
+      // Get the blob from response
+      const blob = await response.blob();
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `成绩数据_${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      
+      // Cleanup
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast.success('数据导出成功');
+    } catch (error) {
+      console.error('Error exporting data:', error);
+      toast.error('数据导出失败');
+    }
   };
 
   const handleEditRecord = (record) => {
@@ -434,6 +489,13 @@ const PerformanceManagement = () => {
             </div>
             <div className="flex items-center space-x-3">
               <button
+                onClick={handleExportData}
+                className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                导出数据
+              </button>
+              <button
                 onClick={() => setShowAddModal(true)}
                 className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
               >
@@ -540,16 +602,13 @@ const PerformanceManagement = () => {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   比赛名称
                 </label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4" />
-                  <input
-                    type="text"
-                    value={filters.eventName}
-                    onChange={(e) => handleFilterChange('eventName', e.target.value)}
-                    placeholder="搜索比赛名称"
-                    className="pl-10 w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
+                <EventAutocompleteInput
+                  value={filters.eventName}
+                  onChange={(value) => handleFilterChange('eventName', value)}
+                  placeholder="搜索比赛名称"
+                  events={events}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
               </div>
 
               <div>

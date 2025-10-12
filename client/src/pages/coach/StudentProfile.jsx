@@ -4,6 +4,7 @@ import { User, Calendar, Award, Filter, Search, ChevronLeft, Edit3, Trophy, Meda
 import { toast } from 'react-toastify';
 import ReactCrop from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
+import EventAutocompleteInput from '../../components/EventAutocompleteInput';
 
 const StudentProfile = () => {
   const { id } = useParams();
@@ -12,6 +13,7 @@ const StudentProfile = () => {
   const [student, setStudent] = useState(null);
   const [completionRecords, setCompletionRecords] = useState([]);
   const [filteredRecords, setFilteredRecords] = useState([]);
+  const [events, setEvents] = useState([]);
   const [activeTab, setActiveTab] = useState('records');
   const [filters, setFilters] = useState({
     eventName: '',
@@ -37,6 +39,7 @@ const StudentProfile = () => {
 
   useEffect(() => {
     fetchStudentProfile();
+    fetchEvents();
   }, [id]);
 
   // Image cropping effect
@@ -161,6 +164,34 @@ const StudentProfile = () => {
       navigate('/coach/students');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchEvents = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/events', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Events API response:', data); // Debug log
+        if (data.success && Array.isArray(data.data)) {
+          console.log('Setting events from data.data:', data.data); // Debug log
+          setEvents(data.data);
+        } else if (Array.isArray(data)) {
+          console.log('Setting events from direct array:', data); // Debug log
+          setEvents(data);
+        } else {
+          console.log('Unexpected events data structure:', data); // Debug log
+          setEvents([]);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching events:', error);
     }
   };
 
@@ -658,16 +689,13 @@ const StudentProfile = () => {
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         比赛名称
                       </label>
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                        <input
-                          type="text"
-                          value={filters.eventName}
-                          onChange={(e) => handleFilterChange('eventName', e.target.value)}
-                          placeholder="搜索比赛名称"
-                          className="pl-10 w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                      </div>
+                      <EventAutocompleteInput
+                        value={filters.eventName}
+                        onChange={(value) => handleFilterChange('eventName', value)}
+                        placeholder="搜索比赛名称"
+                        events={events}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
                     </div>
 
                     <div>

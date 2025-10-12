@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Award, Filter, Search, Trophy, Medal, Target, Edit, Trash2, Calendar, Clock, Users, Edit2 } from 'lucide-react';
+import EventAutocompleteInput from './EventAutocompleteInput';
 
-const CompletionRecordsTable = ({ records = [], onEdit, onDelete }) => {
+const CompletionRecordsTable = ({ records = [], onEdit, onDelete, events = [] }) => {
   const [filteredRecords, setFilteredRecords] = useState([]);
   const [filters, setFilters] = useState({
     eventName: '',
@@ -171,16 +172,13 @@ const CompletionRecordsTable = ({ records = [], onEdit, onDelete }) => {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               比赛名称
             </label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4" />
-              <input
-                type="text"
-                value={filters.eventName}
-                onChange={(e) => handleFilterChange('eventName', e.target.value)}
-                placeholder="搜索比赛名称"
-                className="pl-10 w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
+            <EventAutocompleteInput
+              value={filters.eventName}
+              onChange={(value) => handleFilterChange('eventName', value)}
+              placeholder="搜索比赛名称"
+              events={events}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
           </div>
 
           <div>
