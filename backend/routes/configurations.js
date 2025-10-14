@@ -16,7 +16,7 @@ const logger = require('../utils/logger');
  *           minimum: 1
  *         colorCode:
  *           type: string
- *           pattern: '^#[0-9A-F]{6}
+ *           pattern: '^#[0-9A-F]{6}$'
  *         color:
  *           type: string
  *           description: Chinese color name$'

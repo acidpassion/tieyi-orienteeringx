@@ -43,6 +43,8 @@ const router = express.Router();
  *                 type: string
  *               teamSize:
  *                 type: number
+ *               externalGameId:
+ *                 type: string
  *         groups:
  *           type: array
  *           items:

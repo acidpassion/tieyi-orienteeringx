@@ -6,26 +6,6 @@
     "auditLog": "/Users/alex/dev/orienteering_quiz_app/backend/logs/.9a7d9e9fa7a77063b3a4dff6e533df022998f06a-audit.json",
     "files": [
         {
-            "date": 1757515510192,
-            "name": "/Users/alex/dev/orienteering_quiz_app/backend/logs/error-2025-09-10.log",
-            "hash": "a5adad4064688c5538e1098e14587a16816fa993e21cc50281657be428f742f2"
-        },
-        {
-            "date": 1757600319034,
-            "name": "/Users/alex/dev/orienteering_quiz_app/backend/logs/error-2025-09-11.log",
-            "hash": "2cc035074195e22e7976aa013456621ef721b88d853bcf5c6322842c466f6043"
-        },
-        {
-            "date": 1757606601556,
-            "name": "/Users/alex/dev/orienteering_quiz_app/backend/logs/error-2025-09-12.log",
-            "hash": "55d3cfb71f61739312184c72f6a2484822b2a8372b4a7cb4a44397c744606096"
-        },
-        {
-            "date": 1757693376957,
-            "name": "/Users/alex/dev/orienteering_quiz_app/backend/logs/error-2025-09-13.log",
-            "hash": "24ce7470cee4d699d06a7cc06cf456ad5c769f55e3a9f0dd05277ac90522e312"
-        },
-        {
             "date": 1757780380739,
             "name": "/Users/alex/dev/orienteering_quiz_app/backend/logs/error-2025-09-14.log",
             "hash": "ced80a6f1764a540f1a5d80ab1f277f0febe4cb8f558ed51b176c53846ee9e07"
@@ -114,6 +94,16 @@
             "date": 1760058951642,
             "name": "/Users/alex/dev/orienteering_quiz_app/backend/logs/error-2025-10-10.log",
             "hash": "a7890a7f0800c5fcdadb5afc8a30288be82345624c78f467afa17d6310157f58"
+        },
+        {
+            "date": 1760271622671,
+            "name": "/Users/alex/dev/orienteering_quiz_app/backend/logs/error-2025-10-12.log",
+            "hash": "a71945d41777b08eda001b7ccd7f755be643766aba64b3c5e175cde108e8a71a"
+        },
+        {
+            "date": 1760362087919,
+            "name": "/Users/alex/dev/orienteering_quiz_app/backend/logs/error-2025-10-13.log",
+            "hash": "3facf928d48f2429f26e06afe4db0038dbef69405356ee2d602d79a56f72c640"
         }
     ],
     "hashType": "sha256"

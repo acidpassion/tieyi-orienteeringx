@@ -3,15 +3,16 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from '../../config/axiosConfig';
 import { toast } from 'react-toastify';
 import { createApiUrl } from '../../config/api';
-import { Calendar, Save, ArrowLeft, Settings, Users, Trophy, MapPin } from 'lucide-react';
+import { Calendar, Save, ArrowLeft, Settings, Users, Trophy, MapPin, Download, Database } from 'lucide-react';
 import { useConfiguration } from '../../context/ConfigurationContext';
+import EventResultsTab from '../../components/EventResultsTab';
 
 const EventEdit = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const isCreating = !id || id === 'new';
   const [loading, setLoading] = useState(!isCreating);
-  
+
   // Debug logging
   console.log('EventEdit Debug:', {
     id,
@@ -20,6 +21,8 @@ const EventEdit = () => {
   });
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('basic');
+  const [loadingMatchData, setLoadingMatchData] = useState({});
+  const [savingResults, setSavingResults] = useState({});
 
   // Get configuration data first
   const { gameTypes: gameTypeOptions, classes: groupOptions, eventTypes, orgs, loading: configLoading } = useConfiguration();
@@ -49,7 +52,7 @@ const EventEdit = () => {
       id,
       shouldFetch: !isCreating && id && id !== 'new'
     });
-    
+
     if (!isCreating && id && id !== 'new') {
       console.log('Calling fetchEvent...');
       fetchEvent();
@@ -66,7 +69,7 @@ const EventEdit = () => {
       console.log('fetchEvent: Early return - isCreating is true');
       return;
     }
-    
+
     try {
       console.log('fetchEvent: Setting loading to true');
       setLoading(true);
@@ -82,14 +85,23 @@ const EventEdit = () => {
         gameTypes = gameTypes.map(gameType => {
           const gameTypeSettings = event.gameTypeSettings || {};
           const settings = gameTypeSettings[gameType];
-          const gameTypeObj = { name: gameType };
+          const gameTypeObj = {
+            name: gameType,
+            externalGameId: '' // Initialize with empty string for old data
+          };
           if (settings && settings.teamSize) {
             gameTypeObj.teamSize = settings.teamSize;
           }
           return gameTypeObj;
         });
+      } else {
+        // Ensure all game types have externalGameId field
+        gameTypes = gameTypes.map(gt => ({
+          ...gt,
+          externalGameId: gt.externalGameId || ''
+        }));
       }
-      
+
       setFormData({
         eventName: event.eventName || '',
         organization: event.organization || '',
@@ -121,7 +133,7 @@ const EventEdit = () => {
       console.debug('🔍 typeof id:', typeof id);
       console.debug('🔍 id === "new":', id === 'new');
       console.debug('🔍 id === undefined:', id === undefined);
-      
+
       // Validation
       if (!formData.eventName.trim()) {
         toast.error('请输入赛事名称');
@@ -158,16 +170,16 @@ const EventEdit = () => {
 
       setSaving(true);
       const token = localStorage.getItem('token');
-      
+
       // Prepare form data with proper scoreWeight value
       const submitData = {
         ...formData,
         scoreWeight: parseFloat(formData.scoreWeight) || 1
       };
-      
+
       console.debug('🔍 About to make API call');
       console.debug('🔍 isCreating check:', isCreating);
-      
+
       if (isCreating) {
         // Create new event
         const createUrl = createApiUrl('/api/events');
@@ -200,7 +212,7 @@ const EventEdit = () => {
   const handleGameTypeToggle = (gameTypeName) => {
     setFormData(prev => {
       const isRemoving = prev.gameTypes.some(gt => gt.name === gameTypeName);
-      
+
       if (isRemoving) {
         // Remove the game type
         return {
@@ -209,14 +221,17 @@ const EventEdit = () => {
         };
       } else {
         // Add the game type
-        const newGameType = { name: gameTypeName };
-        
+        const newGameType = {
+          name: gameTypeName,
+          externalGameId: '' // Initialize with empty string
+        };
+
         // Add default team size for relay games and team games
         if (gameTypeName.includes('接力') || gameTypeName === '团队赛') {
           const defaultTeamSize = gameTypeName === '团队赛' ? 2 : 2;
           newGameType.teamSize = defaultTeamSize;
         }
-        
+
         return {
           ...prev,
           gameTypes: [...prev.gameTypes, newGameType]
@@ -229,12 +244,118 @@ const EventEdit = () => {
   const handleTeamSizeChange = (gameTypeName, teamSize) => {
     setFormData(prev => ({
       ...prev,
-      gameTypes: prev.gameTypes.map(gt => 
-        gt.name === gameTypeName 
+      gameTypes: prev.gameTypes.map(gt =>
+        gt.name === gameTypeName
           ? { ...gt, teamSize: parseInt(teamSize) || 2 }
           : gt
       )
     }));
+  };
+
+  // Handle external game ID change
+  const handleExternalGameIdChange = (gameTypeName, externalGameId) => {
+    setFormData(prev => ({
+      ...prev,
+      gameTypes: prev.gameTypes.map(gt =>
+        gt.name === gameTypeName
+          ? { ...gt, externalGameId: externalGameId.trim() }
+          : gt
+      )
+    }));
+  };
+
+  // Handle loading match data from external API
+  const handleLoadMatchData = async (gameTypeName, externalGameId) => {
+    if (!externalGameId || !externalGameId.trim()) {
+      toast.error('请先输入外部项目ID');
+      return;
+    }
+
+    const trimmedId = externalGameId.trim();
+    
+    // Set loading state for this specific game type
+    setLoadingMatchData(prev => ({
+      ...prev,
+      [gameTypeName]: true
+    }));
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        createApiUrl(`/api/match-data/load/${trimmedId}`),
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      if (response.data.success) {
+        toast.success(response.data.message);
+      } else {
+        toast.error(response.data.message || '加载比赛信息失败');
+      }
+    } catch (error) {
+      console.error('Error loading match data:', error);
+      const errorMessage = error.response?.data?.message || '加载比赛信息失败，请稍后重试';
+      toast.error(errorMessage);
+    } finally {
+      // Clear loading state for this game type
+      setLoadingMatchData(prev => ({
+        ...prev,
+        [gameTypeName]: false
+      }));
+    }
+  };
+
+  // Handle saving results to completion records
+  const handleSaveResults = async (gameTypeName, externalGameId) => {
+    if (!externalGameId || !externalGameId.trim()) {
+      toast.error('请先输入外部项目ID');
+      return;
+    }
+
+    if (!id || id === 'new') {
+      toast.error('请先保存赛事后再保存成绩');
+      return;
+    }
+
+    const trimmedId = externalGameId.trim();
+    
+    // Set loading state for this specific game type
+    setSavingResults(prev => ({
+      ...prev,
+      [gameTypeName]: true
+    }));
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        createApiUrl(`/api/match-data/save-results/${trimmedId}`),
+        {
+          eventId: id,
+          gameType: gameTypeName
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      if (response.data.success) {
+        toast.success(response.data.message);
+      } else {
+        toast.error(response.data.message || '保存成绩失败');
+      }
+    } catch (error) {
+      console.error('Error saving results:', error);
+      const errorMessage = error.response?.data?.message || '保存成绩失败，请稍后重试';
+      toast.error(errorMessage);
+    } finally {
+      // Clear loading state for this game type
+      setSavingResults(prev => ({
+        ...prev,
+        [gameTypeName]: false
+      }));
+    }
   };
 
   // Handle group toggle
@@ -258,7 +379,8 @@ const EventEdit = () => {
   const tabs = [
     { id: 'basic', name: '基本信息', icon: Calendar },
     { id: 'settings', name: '赛事设置', icon: Settings },
-    { id: 'registration', name: '报名管理', icon: Users }
+    { id: 'registration', name: '报名管理', icon: Users },
+    { id: 'results', name: '赛事成绩', icon: Trophy }
   ];
 
   return (
@@ -303,11 +425,10 @@ const EventEdit = () => {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 ${
-                    activeTab === tab.id
-                      ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-                  }`}
+                  className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 ${activeTab === tab.id
+                    ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+                    }`}
                 >
                   <Icon className="h-4 w-4" />
                   <span>{tab.name}</span>
@@ -459,7 +580,7 @@ const EventEdit = () => {
                     const isSelected = !!selectedGameType;
                     const isRelay = gameTypeName.includes('接力') || gameTypeName === '团队赛';
                     const teamSize = selectedGameType?.teamSize || 2;
-                    
+
                     return (
                       <div key={gameTypeName} className="border rounded-lg p-4">
                         <label className="flex items-center space-x-2 cursor-pointer mb-3">
@@ -471,10 +592,10 @@ const EventEdit = () => {
                           />
                           <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{gameTypeName}</span>
                         </label>
-                        
+
                         {/* Team Size for Relay Games */}
                         {isSelected && isRelay && (
-                          <div className="ml-6">
+                          <div className="ml-6 mb-3">
                             <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                               队伍人数上限
                             </label>
@@ -487,6 +608,57 @@ const EventEdit = () => {
                               className="w-20 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                             />
                             <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">人</span>
+                          </div>
+                        )}
+
+                        {/* External Game ID */}
+                        {isSelected && (
+                          <div className="ml-6">
+                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                              外部赛事ID (可选)
+                            </label>
+                            <div className="space-y-2">
+                              <div className="flex space-x-2">
+                                <input
+                                  type="text"
+                                  value={selectedGameType?.externalGameId || ''}
+                                  onChange={(e) => handleExternalGameIdChange(gameTypeName, e.target.value)}
+                                  placeholder="输入主办方提供的赛事ID"
+                                  className="flex-1 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
+                              </div>
+                              <div className="flex space-x-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleLoadMatchData(gameTypeName, selectedGameType?.externalGameId)}
+                                  disabled={!selectedGameType?.externalGameId?.trim() || loadingMatchData[gameTypeName]}
+                                  className="flex-1 px-3 py-1 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed rounded flex items-center justify-center space-x-1 transition-colors"
+                                >
+                                  {loadingMatchData[gameTypeName] ? (
+                                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                                  ) : (
+                                    <Download className="h-3 w-3" />
+                                  )}
+                                  <span>{loadingMatchData[gameTypeName] ? '加载中...' : '加载比赛信息'}</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSaveResults(gameTypeName, selectedGameType?.externalGameId)}
+                                  disabled={!selectedGameType?.externalGameId?.trim() || savingResults[gameTypeName] || isCreating}
+                                  className="flex-1 px-3 py-1 text-xs font-medium text-white bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed rounded flex items-center justify-center space-x-1 transition-colors"
+                                >
+                                  {savingResults[gameTypeName] ? (
+                                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                                  ) : (
+                                    <Database className="h-3 w-3" />
+                                  )}
+                                  <span>{savingResults[gameTypeName] ? '保存中...' : '保存成绩'}</span>
+                                </button>
+                              </div>
+                            </div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                              用于从主办方系统获取成绩数据的赛事标识符
+                            </p>
                           </div>
                         )}
                       </div>
@@ -555,6 +727,11 @@ const EventEdit = () => {
                 </div>
               )}
             </div>
+          )}
+
+          {/* Results Tab */}
+          {activeTab === 'results' && (
+            <EventResultsTab eventId={id} isCreating={isCreating} />
           )}
         </div>
       </div>

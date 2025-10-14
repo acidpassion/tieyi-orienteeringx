@@ -11,6 +11,11 @@ const gameTypeSchema = new mongoose.Schema({
     type: Number,
     min: 1,
     max: 10
+  },
+  externalGameId: {
+    type: String,
+    trim: true,
+    default: ''
   }
 }, { _id: false });
 

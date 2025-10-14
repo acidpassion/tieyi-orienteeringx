@@ -6,7 +6,10 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "migrate:gameTypes": "node migrations/migrate-gameTypes-structure.js"
+    "migrate:gameTypes": "node migrations/migrate-gameTypes-structure.js",
+    "migrate:externalGameId": "node migrations/add-external-game-id.js",
+    "migrate:reasonPunchs": "node migrations/add-reason-punchs-fields.js",
+    "migrate:relayPersonalTime": "node migrations/add-relay-personal-time-field.js"
   },
   "dependencies": {
     "axios": "^1.11.0",

@@ -20,6 +20,8 @@ const registrationRoutes = require('./routes/registrations');
 const relayTeamRoutes = require('./routes/relayTeams');
 const configurationRoutes = require('./routes/configurations');
 const documentRoutes = require('./routes/documents');
+const matchDataRoutes = require('./routes/matchData');
+const eventResultsRoutes = require('./routes/eventResults');
 
 const app = express();
 
@@ -54,6 +56,8 @@ app.use('/api/registrations', registrationRoutes);
 app.use('/api/relay-teams', relayTeamRoutes);
 app.use('/api/configurations', configurationRoutes);
 app.use('/api/documents', documentRoutes);
+app.use('/api/match-data', matchDataRoutes);
+app.use('/api/event-results', eventResultsRoutes);
 
 // 404 handler
 app.use('*', handle404);

@@ -467,6 +467,34 @@ const PerformanceManagement = () => {
     );
   };
 
+  const getReasonBadge = (reason) => {
+    if (!reason) {
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+          -
+        </span>
+      );
+    }
+
+    // Different colors for different reason types
+    const reasonStyles = {
+      'OK': 'bg-green-100 text-green-800',
+      'DNF': 'bg-red-100 text-red-800',
+      'DSQ': 'bg-red-100 text-red-800',
+      'MP': 'bg-yellow-100 text-yellow-800',
+      'OT': 'bg-orange-100 text-orange-800',
+      'default': 'bg-blue-100 text-blue-800'
+    };
+
+    const styleClass = reasonStyles[reason] || reasonStyles.default;
+
+    return (
+      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${styleClass}`}>
+        {reason}
+      </span>
+    );
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
@@ -738,6 +766,9 @@ const PerformanceManagement = () => {
                         状态
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        原因
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                         日期
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -813,6 +844,9 @@ const PerformanceManagement = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             {getValidityBadge(record.validity)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {getReasonBadge(record.reason)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                             {formatDate(record.eventDate)}
@@ -895,7 +929,7 @@ const PerformanceManagement = () => {
                         </div>
                       </div>
                       
-                      <div className="mt-3 grid grid-cols-4 gap-4 text-sm">
+                      <div className="mt-3 grid grid-cols-2 gap-4 text-sm">
                         <div>
                           <span className="text-gray-500 dark:text-gray-400">比赛项目:</span>
                           <div className="font-medium text-gray-900 dark:text-white">{typeof record.gameType === 'string' ? record.gameType : record.gameType?.name || record.gameType}</div>
@@ -925,6 +959,18 @@ const PerformanceManagement = () => {
                           </div>
                         </div>
                       </div>
+                      
+                      {/* Only show reason for invalid records on mobile */}
+                      {!record.validity && (
+                        <div className="mt-3 flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <div>
+                              <span className="text-gray-500 dark:text-gray-400 text-sm">原因:</span>
+                              <div className="mt-1">{getReasonBadge(record.reason)}</div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                       
                       <div className="mt-3 flex justify-end space-x-3">
                         {student && (

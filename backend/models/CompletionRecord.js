@@ -43,6 +43,22 @@ const completionRecordSchema = new mongoose.Schema({
   score: {
     type: Number,
     required: false // 可选字段，用于积分赛等需要分数的比赛
+  },
+  reason: {
+    type: String,
+    required: false // 可选字段，存储比赛结果原因（如DNF、DSQ等）
+  },
+  punchs: {
+    type: mongoose.Schema.Types.Mixed,
+    required: false // 可选字段，存储打卡记录数组
+  },
+  relayPersonalTotalTime: {
+    type: String,
+    required: false // 可选字段，存储接力赛中个人的总时间
+  },
+  teamId: {
+    type: String,
+    required: false // 可选字段，存储接力赛中的队伍ID
   }
 }, {
   timestamps: true
