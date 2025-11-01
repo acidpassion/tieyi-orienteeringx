@@ -48,6 +48,16 @@ const completionRecordSchema = new mongoose.Schema({
     type: String,
     required: false // 可选字段，存储比赛结果原因（如DNF、DSQ等）
   },
+  startTime: {
+    type: String,
+    match: /^\d{1,2}:\d{2}:\d{2}([.,]\d{1,3})?$/,
+    required: false
+  },  // Supports formats: HH:MM:SS, HH:MM:SS.mmm, HH:MM:SS,mmm
+  finishTime: {
+    type: String,
+    match: /^\d{1,2}:\d{2}:\d{2}([.,]\d{1,3})?$/,
+    required: false
+  }, // Supports formats: HH:MM:SS, HH:MM:SS.mmm, HH:MM:SS,mmm
   punchs: {
     type: mongoose.Schema.Types.Mixed,
     required: false // 可选字段，存储打卡记录数组

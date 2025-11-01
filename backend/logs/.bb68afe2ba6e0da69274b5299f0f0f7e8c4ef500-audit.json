@@ -6,21 +6,6 @@
     "auditLog": "/Users/alex/dev/orienteering_quiz_app/backend/logs/.bb68afe2ba6e0da69274b5299f0f0f7e8c4ef500-audit.json",
     "files": [
         {
-            "date": 1759161897839,
-            "name": "/Users/alex/dev/orienteering_quiz_app/backend/logs/application-2025-09-30.log",
-            "hash": "ed81d0020c2f898c072d2bb5dd361b45bdb5ea9ee55ecafe837c3135978d9920"
-        },
-        {
-            "date": 1759281690952,
-            "name": "/Users/alex/dev/orienteering_quiz_app/backend/logs/application-2025-10-01.log",
-            "hash": "d136977bf80723c99646d7cb8e4606a2381d1b2bd617db3a24ba53b730dd40a0"
-        },
-        {
-            "date": 1759378094714,
-            "name": "/Users/alex/dev/orienteering_quiz_app/backend/logs/application-2025-10-02.log",
-            "hash": "2fe54cbd820dd285e058d4bf9945c3bf4364c362c92403b66b68cb54a585140e"
-        },
-        {
             "date": 1760058951594,
             "name": "/Users/alex/dev/orienteering_quiz_app/backend/logs/application-2025-10-10.log",
             "hash": "229ecbbb0731baec27ca7ad704e8381d82c0225e1aeb59030a7a799891cd8a75"
@@ -34,6 +19,21 @@
             "date": 1760362087867,
             "name": "/Users/alex/dev/orienteering_quiz_app/backend/logs/application-2025-10-13.log",
             "hash": "fa704aec1a0a41bc75794f43f7d70d5c960b839ef24c8b9e14761bdca96bbfa9"
+        },
+        {
+            "date": 1760775862212,
+            "name": "/Users/alex/dev/orienteering_quiz_app/backend/logs/application-2025-10-18.log",
+            "hash": "4bb2342b669b4197dec12df42f38efca4e824a04b5c3cc88d7da7a9a1b9dcc82"
+        },
+        {
+            "date": 1761145467354,
+            "name": "/Users/alex/dev/orienteering_quiz_app/backend/logs/application-2025-10-22.log",
+            "hash": "c7d408316bbc3a7963dbecf6fb9484e83010101e28a2ca2418e39e3512b44ac3"
+        },
+        {
+            "date": 1761148852701,
+            "name": "/Users/alex/dev/orienteering_quiz_app/backend/logs/application-2025-10-23.log",
+            "hash": "b1b3c132f4b334dd52d013deae996a3cadcca6cb3bcb2cf2201ad14bf3ad23ee"
         }
     ],
     "hashType": "sha256"

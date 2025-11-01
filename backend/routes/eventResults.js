@@ -161,6 +161,7 @@ router.get('/:eventId', verifyToken, verifyCoach, async (req, res) => {
         position: record.position,
         validity: record.validity,
         reason: record.reason,
+        score: record.score, // Add score field
         isTeam: !!record.teamId,
         teamId: record.teamId
       };
@@ -319,6 +320,7 @@ router.get('/:eventId/export', verifyToken, verifyCoach, async (req, res) => {
         position: record.position,
         validity: record.validity,
         reason: record.reason,
+        score: record.score, // Add score field
         isTeam: !!record.teamId,
         teamId: record.teamId
       };

@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from '../../config/axiosConfig';
 import { toast } from 'react-toastify';
 import { createApiUrl } from '../../config/api';
-import { Calendar, Save, ArrowLeft, Settings, Users, Trophy, MapPin, Download, Database } from 'lucide-react';
+import { Calendar, Save, ArrowLeft, Settings, Users, Trophy, MapPin, Download, Database, Upload } from 'lucide-react';
 import { useConfiguration } from '../../context/ConfigurationContext';
 import EventResultsTab from '../../components/EventResultsTab';
 
@@ -714,16 +714,41 @@ const EventEdit = () => {
               </div>
 
               {formData.openRegistration && (
-                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <Users className="h-5 w-5 text-blue-600" />
-                    <h3 className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                      报名功能已启用
-                    </h3>
+                <div className="space-y-4">
+                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <Users className="h-5 w-5 text-blue-600" />
+                      <h3 className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                        报名功能已启用
+                      </h3>
+                    </div>
+                    <p className="text-sm text-blue-700 dark:text-blue-200">
+                      学生可以通过系统报名参加此赛事。您可以在报名管理页面查看和管理所有报名信息。
+                    </p>
                   </div>
-                  <p className="text-sm text-blue-700 dark:text-blue-200">
-                    学生可以通过系统报名参加此赛事。您可以在报名管理页面查看和管理所有报名信息。
-                  </p>
+
+                  {/* Upload Registrations Section */}
+                  {!isCreating && (
+                    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-1">
+                            批量上传报名
+                          </h3>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                            上传CSV或Excel文件快速批量注册学生
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => navigate(`/coach/events/${id}/registrations`)}
+                          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
+                        >
+                          <Upload className="h-4 w-4" />
+                          <span>上传报名表</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

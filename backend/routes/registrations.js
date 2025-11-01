@@ -1454,8 +1454,8 @@ router.get('/event/:eventId/export', verifyToken, verifyCoach, async (req, res) 
     // Sub headers for individual events (row 7)
     worksheet.getCell('H7').value = '组别';
     worksheet.getCell('I7').value = '短距离';
-    worksheet.getCell('J7').value = '积分';
-    worksheet.getCell('K7').value = '百米';
+    worksheet.getCell('J7').value = '积分赛';
+    worksheet.getCell('K7').value = '百米赛';
 
     // Sub headers for relay (row 7)
     worksheet.getCell('L7').value = '组别';
@@ -1564,9 +1564,9 @@ router.get('/event/:eventId/export', verifyToken, verifyCoach, async (req, res) 
             studentIndividualRegs.forEach(reg => {
               if (reg.gameType === '短距离') {
                 worksheet.getCell(`I${currentRow}`).value = '√';
-              } else if (reg.gameType === '积分') {
+              } else if (reg.gameType === '积分赛') {
                 worksheet.getCell(`J${currentRow}`).value = '√';
-              } else if (reg.gameType === '百米') {
+              } else if (reg.gameType === '百米赛') {
                 worksheet.getCell(`K${currentRow}`).value = '√';
               }
             });
@@ -1656,9 +1656,9 @@ router.get('/event/:eventId/export', verifyToken, verifyCoach, async (req, res) 
           studentData.gameTypes.forEach(reg => {
             if (reg.gameType === '短距离') {
               worksheet.getCell(`I${currentRow}`).value = '√';
-            } else if (reg.gameType === '积分') {
+            } else if (reg.gameType === '积分赛') {
               worksheet.getCell(`J${currentRow}`).value = '√';
-            } else if (reg.gameType === '百米') {
+            } else if (reg.gameType === '百米赛') {
               worksheet.getCell(`K${currentRow}`).value = '√';
             }
           });

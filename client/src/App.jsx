@@ -27,6 +27,7 @@ import DashboardRedirect from './components/DashboardRedirect';
 import CoachEvents from './pages/coach/Events';
 import EventEdit from './pages/coach/EventEdit';
 import EventRegistrations from './pages/coach/EventRegistrations';
+import EventResults from './pages/coach/EventResults';
 import EventRegistration from './pages/EventRegistration';
 import EventRegistrationDetail from './pages/EventRegistrationDetail';
 import JoinRelayTeam from './pages/JoinRelayTeam';
@@ -230,6 +231,16 @@ function App() {
                 <ProtectedRoute>
                   <Layout>
                     <EventRegistrations />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/coach/events/:id/results"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <EventResults />
                   </Layout>
                 </ProtectedRoute>
               }

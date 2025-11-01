@@ -1,7 +1,11 @@
 const express = require('express');
 const ExcelJS = require('exceljs');
+const XLSX = require('xlsx');
+const csv = require('csv-parser');
+const { Readable } = require('stream');
 const CompletionRecord = require('../models/CompletionRecord');
 const { verifyToken, verifyCoach, verifyCoachOrStudent, verifyCoachOrOwner } = require('../middleware/auth');
+const { fileUploadMiddleware } = require('../middleware/fileUpload');
 const logger = require('../utils/logger');
 
 const router = express.Router();
@@ -111,19 +115,19 @@ router.get('/', verifyToken, verifyCoach, async (req, res) => {
     url: '/api/completion-records',
     userId: req.user._id
   });
-  
+
   try {
     const { name, studentName, startDate, endDate, eventName, gameType, validity } = req.query;
-    
+
     // Build query filter
     let filter = {};
-    
+
     // Support both 'name' and 'studentName' parameters for backward compatibility
     const nameFilter = name || studentName;
     if (nameFilter) {
       filter.name = { $regex: nameFilter, $options: 'i' };
     }
-    
+
     if (startDate || endDate) {
       filter.eventDate = {};
       if (startDate) {
@@ -138,11 +142,11 @@ router.get('/', verifyToken, verifyCoach, async (req, res) => {
         console.log('DEBUG: endDate filter:', endDate, '-> parsed:', filter.eventDate.$lte);
       }
     }
-    
+
     if (eventName) {
       filter.eventName = { $regex: eventName, $options: 'i' };
     }
-    
+
     if (gameType) {
       filter.gameType = gameType;
       console.log('DEBUG: gameType filter:', gameType);
@@ -155,25 +159,25 @@ router.get('/', verifyToken, verifyCoach, async (req, res) => {
     }
 
     console.log('DEBUG: Final filter:', JSON.stringify(filter, null, 2));
-    
+
     logger.logDatabase('Finding completion records with filter', 'completionRecords', { filter }, {});
-    
+
     const records = await CompletionRecord.find(filter)
       .sort({ eventDate: -1 })
       .lean();
-    
+
     console.log('DEBUG: Query results - records returned:', records.length);
     if (records.length > 0) {
       console.log('DEBUG: First record eventDate:', records[0].eventDate);
     }
-    
+
     logger.info('Completion records retrieved successfully', {
       requestId,
       count: records.length,
       filter,
       coachId: req.user._id
     });
-    
+
     res.json({
       success: true,
       data: {
@@ -247,17 +251,17 @@ router.get('/export', verifyToken, verifyCoach, async (req, res) => {
     url: '/api/completion-records/export',
     userId: req.user._id
   });
-  
+
   try {
     const { studentName, startDate, endDate, eventName, gameType, validity } = req.query;
-    
+
     // Build query filter (same as the main GET endpoint)
     let filter = {};
-    
+
     if (studentName) {
       filter.name = { $regex: studentName, $options: 'i' };
     }
-    
+
     if (startDate || endDate) {
       filter.eventDate = {};
       if (startDate) {
@@ -269,11 +273,11 @@ router.get('/export', verifyToken, verifyCoach, async (req, res) => {
         filter.eventDate.$lte = endOfDay;
       }
     }
-    
+
     if (eventName) {
       filter.eventName = { $regex: eventName, $options: 'i' };
     }
-    
+
     if (gameType) {
       filter.gameType = gameType;
     }
@@ -281,19 +285,19 @@ router.get('/export', verifyToken, verifyCoach, async (req, res) => {
     if (validity !== undefined) {
       filter.validity = validity === 'true';
     }
-    
+
     logger.logDatabase('Exporting completion records with filter', 'completionRecords', { filter }, {});
-    
+
     const records = await CompletionRecord.find(filter)
       .sort({ eventDate: -1 })
       .lean();
-    
+
     console.log(`📊 Found ${records.length} records to export`);
-    
+
     // Create workbook and worksheet
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('成绩数据');
-    
+
     // Define columns with Chinese headers
     worksheet.columns = [
       { header: '姓名', key: 'name', width: 12 },
@@ -307,7 +311,7 @@ router.get('/export', verifyToken, verifyCoach, async (req, res) => {
       { header: '有效性', key: 'validity', width: 10 },
       { header: '排名', key: 'position', width: 10 }
     ];
-    
+
     // Style the header row
     worksheet.getRow(1).font = { bold: true };
     worksheet.getRow(1).fill = {
@@ -315,7 +319,7 @@ router.get('/export', verifyToken, verifyCoach, async (req, res) => {
       pattern: 'solid',
       fgColor: { argb: 'FFE0E0E0' }
     };
-    
+
     // Add data rows
     records.forEach(record => {
       worksheet.addRow({
@@ -331,7 +335,7 @@ router.get('/export', verifyToken, verifyCoach, async (req, res) => {
         position: record.position || ''
       });
     });
-    
+
     // Add borders to all cells
     worksheet.eachRow((row, rowNumber) => {
       row.eachCell((cell) => {
@@ -343,26 +347,26 @@ router.get('/export', verifyToken, verifyCoach, async (req, res) => {
         };
       });
     });
-    
+
     // Set response headers
     const filename = `成绩数据_${new Date().toISOString().split('T')[0]}.xlsx`;
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
-    
+
     console.log(`📤 Writing Excel file to response...`);
-    
+
     // Write to response
     await workbook.xlsx.write(res);
-    
+
     console.log(`✅ Excel file written successfully`);
-    
+
     logger.info('Completion records exported successfully', {
       requestId,
       count: records.length,
       filter,
       coachId: req.user._id
     });
-    
+
     res.end();
   } catch (error) {
     logger.error('Excel export failed', {
@@ -371,7 +375,7 @@ router.get('/export', verifyToken, verifyCoach, async (req, res) => {
       stack: error.stack,
       userId: req.user._id
     });
-    
+
     // Only send JSON error if headers haven't been sent yet
     if (!res.headersSent) {
       res.status(500).json({ success: false, message: 'Server error' });
@@ -450,20 +454,20 @@ router.get('/export', verifyToken, verifyCoach, async (req, res) => {
 router.get('/:studentName', verifyToken, async (req, res) => {
   const requestId = req.requestId;
   const { studentName } = req.params;
-  
+
   logger.info('HTTP Request', {
     requestId,
     method: 'GET',
     url: `/api/completion-records/${studentName}`,
     userId: req.user._id
   });
-  
+
   try {
     const { startDate, endDate, eventName, sortBy = 'eventDate', sortOrder = 'desc' } = req.query;
-    
+
     // Build query filter
     let filter = { name: studentName };
-    
+
     if (startDate || endDate) {
       filter.eventDate = {};
       if (startDate) {
@@ -476,21 +480,21 @@ router.get('/:studentName', verifyToken, async (req, res) => {
         filter.eventDate.$lte = endOfDay;
       }
     }
-    
+
     if (eventName) {
       filter.eventName = { $regex: eventName, $options: 'i' };
     }
-    
+
     // Build sort object
     const sortObj = {};
     sortObj[sortBy] = sortOrder === 'asc' ? 1 : -1;
-    
+
     logger.logDatabase('Finding student completion records', 'completionRecords', { filter, sort: sortObj }, {});
-    
+
     const records = await CompletionRecord.find(filter)
       .sort(sortObj)
       .lean();
-    
+
     logger.info('Student completion records retrieved successfully', {
       requestId,
       studentName,
@@ -498,7 +502,7 @@ router.get('/:studentName', verifyToken, async (req, res) => {
       filter,
       userId: req.user._id
     });
-    
+
     res.json({
       success: true,
       data: {
@@ -580,14 +584,14 @@ router.post('/', verifyToken, verifyCoachOrStudent, async (req, res) => {
     url: '/api/completion-records',
     userId: req.user._id
   });
-  
+
   try {
     const recordData = req.body;
-    
+
     // Validate required fields
     const requiredFields = ['name', 'eventName', 'eventType', 'gameType', 'result', 'groupName', 'eventDate'];
     const missingFields = requiredFields.filter(field => !recordData[field]);
-    
+
     if (missingFields.length > 0) {
       logger.warn('Missing required fields for completion record creation', {
         requestId,
@@ -599,12 +603,12 @@ router.post('/', verifyToken, verifyCoachOrStudent, async (req, res) => {
         message: `Missing required fields: ${missingFields.join(', ')}`
       });
     }
-    
+
     logger.logDatabase('Creating completion record', 'completionRecords', recordData, {});
-    
+
     const completionRecord = new CompletionRecord(recordData);
     await completionRecord.save();
-    
+
     logger.info('Completion record created successfully', {
       requestId,
       recordId: completionRecord._id,
@@ -612,7 +616,7 @@ router.post('/', verifyToken, verifyCoachOrStudent, async (req, res) => {
       eventName: completionRecord.eventName,
       coachId: req.user._id
     });
-    
+
     res.status(201).json({
       success: true,
       data: completionRecord
@@ -688,21 +692,21 @@ router.post('/', verifyToken, verifyCoachOrStudent, async (req, res) => {
 router.put('/:id', verifyToken, verifyCoachOrOwner, async (req, res) => {
   const requestId = req.requestId;
   const { id } = req.params;
-  
+
   logger.info('HTTP Request', {
     requestId,
     method: 'PUT',
     url: `/api/completion-records/${id}`,
     userId: req.user._id
   });
-  
+
   try {
     const updateData = req.body;
-    
+
     // Validate required fields if provided
     const requiredFields = ['eventName', 'eventType', 'gameType', 'result', 'groupName', 'eventDate'];
     const missingFields = requiredFields.filter(field => updateData[field] !== undefined && !updateData[field]);
-    
+
     if (missingFields.length > 0) {
       logger.warn('Invalid fields for completion record update', {
         requestId,
@@ -714,15 +718,15 @@ router.put('/:id', verifyToken, verifyCoachOrOwner, async (req, res) => {
         message: `Invalid fields: ${missingFields.join(', ')}`
       });
     }
-    
+
     logger.logDatabase('Updating completion record', 'completionRecords', { id, updateData }, {});
-    
+
     const completionRecord = await CompletionRecord.findByIdAndUpdate(
       id,
       updateData,
       { new: true, runValidators: true }
     );
-    
+
     if (!completionRecord) {
       logger.warn('Completion record not found for update', {
         requestId,
@@ -734,7 +738,7 @@ router.put('/:id', verifyToken, verifyCoachOrOwner, async (req, res) => {
         message: 'Completion record not found'
       });
     }
-    
+
     logger.info('Completion record updated successfully', {
       requestId,
       recordId: completionRecord._id,
@@ -742,7 +746,7 @@ router.put('/:id', verifyToken, verifyCoachOrOwner, async (req, res) => {
       eventName: completionRecord.eventName,
       coachId: req.user._id
     });
-    
+
     res.json({
       success: true,
       data: completionRecord
@@ -788,19 +792,19 @@ router.put('/:id', verifyToken, verifyCoachOrOwner, async (req, res) => {
 router.delete('/:id', verifyToken, verifyCoachOrOwner, async (req, res) => {
   const requestId = req.requestId;
   const { id } = req.params;
-  
+
   logger.info('HTTP Request', {
     requestId,
     method: 'DELETE',
     url: `/api/completion-records/${id}`,
     userId: req.user._id
   });
-  
+
   try {
     logger.logDatabase('Deleting completion record', 'completionRecords', { id }, {});
-    
+
     const completionRecord = await CompletionRecord.findByIdAndDelete(id);
-    
+
     if (!completionRecord) {
       logger.warn('Completion record not found for deletion', {
         requestId,
@@ -812,7 +816,7 @@ router.delete('/:id', verifyToken, verifyCoachOrOwner, async (req, res) => {
         message: 'Completion record not found'
       });
     }
-    
+
     logger.info('Completion record deleted successfully', {
       requestId,
       recordId: id,
@@ -820,7 +824,7 @@ router.delete('/:id', verifyToken, verifyCoachOrOwner, async (req, res) => {
       eventName: completionRecord.eventName,
       coachId: req.user._id
     });
-    
+
     res.json({
       success: true,
       message: 'Completion record deleted successfully'
@@ -828,6 +832,252 @@ router.delete('/:id', verifyToken, verifyCoachOrOwner, async (req, res) => {
   } catch (error) {
     logger.logError(error, req);
     res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/completion-records/parse-file:
+ *   post:
+ *     summary: Parse uploaded CSV or Excel file and return columns and data
+ *     tags: [CompletionRecords]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: File parsed successfully
+ *       400:
+ *         description: Invalid file or format
+ *       500:
+ *         description: Server error
+ */
+router.post('/parse-file', verifyToken, verifyCoach, fileUploadMiddleware, async (req, res) => {
+  const requestId = req.requestId;
+
+  logger.info('HTTP Request', {
+    requestId,
+    method: 'POST',
+    url: '/api/completion-records/parse-file',
+    userId: req.user._id
+  });
+
+  try {
+    const file = req.file;
+
+    if (!file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No file uploaded'
+      });
+    }
+
+    let rows = [];
+    let columns = [];
+
+    // Parse based on file type
+    const fileExtension = file.originalname.split('.').pop().toLowerCase();
+
+    if (fileExtension === 'csv') {
+      // Parse CSV
+      const results = [];
+      const stream = Readable.from(file.buffer.toString('utf-8'));
+
+      await new Promise((resolve, reject) => {
+        stream
+          .pipe(csv())
+          .on('data', (data) => results.push(data))
+          .on('end', () => resolve())
+          .on('error', (error) => reject(error));
+      });
+
+      if (results.length > 0) {
+        columns = Object.keys(results[0]);
+        rows = results;
+      }
+    } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
+      // Parse Excel
+      const workbook = XLSX.read(file.buffer, { type: 'buffer' });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+      if (jsonData.length > 0) {
+        columns = Object.keys(jsonData[0]);
+        rows = jsonData;
+      }
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'Unsupported file format'
+      });
+    }
+
+    logger.info('File parsed successfully', {
+      requestId,
+      fileName: file.originalname,
+      rowCount: rows.length,
+      columnCount: columns.length,
+      coachId: req.user._id
+    });
+
+    res.json({
+      success: true,
+      data: {
+        columns,
+        rows,
+        rowCount: rows.length
+      }
+    });
+  } catch (error) {
+    logger.logError(error, req);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to parse file: ' + error.message
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/completion-records/bulk-upsert:
+ *   post:
+ *     summary: Bulk insert or update completion records
+ *     tags: [CompletionRecords]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               records:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *     responses:
+ *       200:
+ *         description: Records processed successfully
+ *       400:
+ *         description: Invalid input data
+ *       500:
+ *         description: Server error
+ */
+router.post('/bulk-upsert', verifyToken, verifyCoach, async (req, res) => {
+  const requestId = req.requestId;
+
+  logger.info('HTTP Request', {
+    requestId,
+    method: 'POST',
+    url: '/api/completion-records/bulk-upsert',
+    userId: req.user._id
+  });
+
+  try {
+    const { records } = req.body;
+
+    if (!Array.isArray(records) || records.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Records array is required and must not be empty'
+      });
+    }
+
+    let inserted = 0;
+    let updated = 0;
+    const errors = [];
+
+    // Process each record
+    for (const record of records) {
+      try {
+        // Validate required fields
+        if (!record.name || !record.eventName || !record.gameType || !record.groupName) {
+          console.log('Missing required fields for record:', record);
+          errors.push({
+            record,
+            error: 'Missing required fields: name, eventName, gameType, or groupName'
+          });
+          continue;
+        }
+
+        // Additional validation for eventDate
+        if (!record.eventDate) {
+          console.log('Missing eventDate for record:', record);
+          errors.push({
+            record,
+            error: 'Missing required field: eventDate'
+          });
+          continue;
+        }
+
+        // Find existing record by unique combination
+        const existingRecord = await CompletionRecord.findOne({
+          name: record.name,
+          eventName: record.eventName,
+          gameType: record.gameType,
+          groupName: record.groupName
+        });
+
+        if (existingRecord) {
+          // Update existing record
+          console.log('Updating existing record for:', record.name);
+          await CompletionRecord.findByIdAndUpdate(
+            existingRecord._id,
+            record,
+            { runValidators: true }
+          );
+          updated++;
+        } else {
+          // Insert new record
+          console.log('Inserting new record for:', record.name);
+          const newRecord = new CompletionRecord(record);
+          await newRecord.save();
+          inserted++;
+        }
+      } catch (error) {
+        console.error('Error processing record:', record, 'Error:', error.message);
+        errors.push({
+          record,
+          error: error.message
+        });
+      }
+    }
+
+    logger.info('Bulk upsert completed', {
+      requestId,
+      total: records.length,
+      inserted,
+      updated,
+      errors: errors.length,
+      coachId: req.user._id
+    });
+
+    res.json({
+      success: true,
+      data: {
+        total: records.length,
+        inserted,
+        updated,
+        errors: errors.length > 0 ? errors : undefined
+      }
+    });
+  } catch (error) {
+    logger.logError(error, req);
+    res.status(500).json({
+      success: false,
+      message: 'Bulk upsert failed: ' + error.message
+    });
   }
 });
 

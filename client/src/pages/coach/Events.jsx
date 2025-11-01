@@ -43,7 +43,7 @@ const Events = () => {
 
     // Text search filter
     if (searchTerm.trim()) {
-      filtered = filtered.filter(event => 
+      filtered = filtered.filter(event =>
         event.eventName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         event.organization.toLowerCase().includes(searchTerm.toLowerCase())
       );
@@ -255,6 +255,13 @@ const Events = () => {
                               <Users className="h-4 w-4" />
                             </button>
                           )}
+                          <button
+                            onClick={() => navigate(`/coach/events/${event._id}/results`)}
+                            className="text-purple-600 hover:text-purple-900 dark:text-purple-400 dark:hover:text-purple-300"
+                            title="赛事成绩"
+                          >
+                            <BarChart3 className="h-4 w-4" />
+                          </button>
                           <button
                             onClick={() => handleDelete(event)}
                             className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"

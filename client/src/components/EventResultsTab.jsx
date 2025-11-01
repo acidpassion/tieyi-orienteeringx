@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import axios from '../config/axiosConfig';
 import { toast } from 'react-toastify';
 import { createApiUrl } from '../config/api';
-import { Download, Trophy, Users, X } from 'lucide-react';
+import { Download, Trophy, Users, X, Upload } from 'lucide-react';
+import ResultUploadModal from './ResultUploadModal';
 
 const EventResultsTab = ({ eventId, isCreating }) => {
   const [loading, setLoading] = useState(false);
@@ -11,13 +12,14 @@ const EventResultsTab = ({ eventId, isCreating }) => {
   const [gameTypes, setGameTypes] = useState([]);
   const [event, setEvent] = useState(null);
   const [teamColors, setTeamColors] = useState({});
+  const [showUploadModal, setShowUploadModal] = useState(false);
 
   // Generate gradient colors for teams
   const generateTeamColors = (teamResults) => {
     const colors = {};
     const baseColors = [
       'bg-red-50 border-red-200',
-      'bg-blue-50 border-blue-200', 
+      'bg-blue-50 border-blue-200',
       'bg-green-50 border-green-200',
       'bg-yellow-50 border-yellow-200',
       'bg-purple-50 border-purple-200',
@@ -27,15 +29,15 @@ const EventResultsTab = ({ eventId, isCreating }) => {
       'bg-teal-50 border-teal-200',
       'bg-cyan-50 border-cyan-200'
     ];
-    
+
     let colorIndex = 0;
     const uniqueTeamIds = [...new Set(teamResults.map(result => result.teamId).filter(Boolean))];
-    
+
     uniqueTeamIds.forEach(teamId => {
       colors[teamId] = baseColors[colorIndex % baseColors.length];
       colorIndex++;
     });
-    
+
     return colors;
   };
 
@@ -57,7 +59,14 @@ const EventResultsTab = ({ eventId, isCreating }) => {
         setEvent(event);
         setGameTypes(gameTypes); // Already ordered: relay first, then individual
         setResults(results);
-        
+
+        // Debug: Check if score data is being received
+        console.log('Event results data:', { gameTypes, results: results.slice(0, 2) });
+        const scoreResults = results.filter(r =>
+          Object.values(r.gameTypes).some(gt => gt.score !== undefined && gt.score !== null)
+        );
+        console.log('Results with scores:', scoreResults.length, scoreResults.slice(0, 2));
+
         // Generate team colors for visual grouping
         const teamResults = results.filter(r => r.isTeamMember);
         setTeamColors(generateTeamColors(teamResults));
@@ -69,6 +78,11 @@ const EventResultsTab = ({ eventId, isCreating }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Handle upload success
+  const handleUploadSuccess = () => {
+    fetchEventResults();
   };
 
   // Export to Excel
@@ -93,24 +107,24 @@ const EventResultsTab = ({ eventId, isCreating }) => {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      
+
       // Extract filename from response headers or use default
       const contentDisposition = response.headers['content-disposition'];
       let filename = `${event?.eventName || '赛事'}_成绩表_${new Date().toISOString().split('T')[0]}.xlsx`;
-      
+
       if (contentDisposition) {
         const filenameMatch = contentDisposition.match(/filename\*?=['"]?([^'";]+)['"]?/);
         if (filenameMatch) {
           filename = decodeURIComponent(filenameMatch[1]);
         }
       }
-      
+
       link.download = filename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      
+
       toast.success('成绩表导出成功');
     } catch (error) {
       console.error('导出失败:', error);
@@ -159,197 +173,246 @@ const EventResultsTab = ({ eventId, isCreating }) => {
     fetchEventResults();
   }, [eventId, isCreating]);
 
-  if (isCreating) {
-    return (
-      <div className="text-center py-12">
-        <Trophy className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-          暂无成绩数据
-        </h3>
-        <p className="text-gray-500 dark:text-gray-400">
-          请先保存赛事并添加成绩数据后查看
-        </p>
-      </div>
-    );
-  }
+  // Render content based on state
+  const renderContent = () => {
+    if (isCreating) {
+      return (
+        <div className="text-center py-12">
+          <Trophy className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+            暂无成绩数据
+          </h3>
+          <p className="text-gray-500 dark:text-gray-400">
+            请先保存赛事并添加成绩数据后查看
+          </p>
+        </div>
+      );
+    }
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
+    if (loading) {
+      return (
+        <div className="flex justify-center items-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
+      );
+    }
 
-  if (!results || results.length === 0) {
+    if (!results || results.length === 0) {
+      return (
+        <div className="text-center py-12">
+          <Trophy className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+            暂无成绩数据
+          </h3>
+          <p className="text-gray-500 dark:text-gray-400">
+            该赛事暂未录入成绩数据
+          </p>
+        </div>
+      );
+    }
+
     return (
-      <div className="text-center py-12">
-        <Trophy className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-          暂无成绩数据
-        </h3>
-        <p className="text-gray-500 dark:text-gray-400">
-          该赛事暂未录入成绩数据
-        </p>
-      </div>
+      <>
+        {/* Results table */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full divide-y divide-gray-200 dark:divide-gray-700" style={{ minWidth: 'max-content' }}>
+              <thead className="bg-gray-50 dark:bg-gray-700">
+                {/* Header row 1: Game type names */}
+                <tr>
+                  <th
+                    rowSpan={2}
+                    className="px-2 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider border border-gray-200 dark:border-gray-600 whitespace-nowrap"
+                    style={{ minWidth: '100px' }}
+                  >
+                    学生信息
+                  </th>
+                  {gameTypes.map(gameType => {
+                    // For 积分赛, show 4 columns (组别, 成绩, 分数, 名次), otherwise 3 columns
+                    const colSpan = gameType === '积分赛' ? 4 : 3;
+                    return (
+                      <th
+                        key={gameType}
+                        colSpan={colSpan}
+                        className="px-1 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider border border-gray-200 dark:border-gray-600 whitespace-nowrap"
+                        style={{ minWidth: gameType === '积分赛' ? '160px' : '120px' }}
+                      >
+                        {gameType}
+                      </th>
+                    );
+                  })}
+                </tr>
+
+                {/* Header row 2: Column names */}
+                <tr>
+                  {gameTypes.map(gameType => (
+                    <React.Fragment key={`${gameType}-headers`}>
+                      <th className="px-1 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider border border-gray-200 dark:border-gray-600 whitespace-nowrap" style={{ minWidth: '40px' }}>
+                        组别
+                      </th>
+                      <th className="px-1 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider border border-gray-200 dark:border-gray-600 whitespace-nowrap" style={{ minWidth: '60px' }}>
+                        成绩
+                      </th>
+                      {gameType === '积分赛' && (
+                        <th className="px-1 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider border border-gray-200 dark:border-gray-600 whitespace-nowrap" style={{ minWidth: '40px' }}>
+                          分数
+                        </th>
+                      )}
+                      <th className="px-1 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider border border-gray-200 dark:border-gray-600 whitespace-nowrap" style={{ minWidth: '40px' }}>
+                        名次
+                      </th>
+                    </React.Fragment>
+                  ))}
+                </tr>
+              </thead>
+
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                {results.map((student, index) => {
+                  const rowStyling = getRowStyling(student);
+                  return (
+                    <tr
+                      key={`${student.name}-${index}`}
+                      className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${rowStyling}`}
+                    >
+                      {/* Student name */}
+                      <td className="px-2 py-1 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white border border-gray-200 dark:border-gray-600" style={{ minWidth: '100px' }}>
+                        <span className="text-sm">{student.name}</span>
+                      </td>
+
+                      {/* Game type results */}
+                      {gameTypes.map(gameType => {
+                        const gameResult = student.gameTypes[gameType];
+                        return (
+                          <React.Fragment key={`${student.name}-${gameType}`}>
+                            {/* Group name */}
+                            <td className="px-1 py-1 text-center text-xs text-gray-900 dark:text-white border border-gray-200 dark:border-gray-600 whitespace-nowrap" style={{ minWidth: '40px' }}>
+                              {gameResult?.groupName || ''}
+                            </td>
+
+                            {/* Result */}
+                            <td className="px-1 py-1 text-center text-xs text-gray-900 dark:text-white border border-gray-200 dark:border-gray-600 whitespace-nowrap" style={{ minWidth: '60px' }}>
+                              {gameResult?.result || ''}
+                            </td>
+
+                            {/* Score - only for 积分赛 */}
+                            {gameType === '积分赛' && (
+                              <td className="px-1 py-1 text-center text-xs text-gray-900 dark:text-white border border-gray-200 dark:border-gray-600 whitespace-nowrap" style={{ minWidth: '40px' }}>
+                                {gameResult?.score !== undefined && gameResult?.score !== null ? gameResult.score : '-'}
+                              </td>
+                            )}
+
+                            {/* Position */}
+                            {renderPositionCell(gameResult)}
+                          </React.Fragment>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Summary statistics */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow">
+            <div className="flex items-center space-x-2">
+              <Users className="h-5 w-5 text-blue-600" />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                参赛学生
+              </span>
+            </div>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white mt-2">
+              {results.length}
+            </p>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow">
+            <div className="flex items-center space-x-2">
+              <Trophy className="h-5 w-5 text-green-600" />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                比赛项目
+              </span>
+            </div>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white mt-2">
+              {gameTypes.length}
+            </p>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow">
+            <div className="flex items-center space-x-2">
+              <Users className="h-5 w-5 text-purple-600" />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                团队成员
+              </span>
+            </div>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white mt-2">
+              {results.filter(r => r.isTeamMember).length}
+            </p>
+          </div>
+        </div>
+      </>
     );
-  }
+  };
 
   return (
     <div className="space-y-6">
-      {/* Header with export button */}
+      {/* Header with import and export buttons - Always visible */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <Trophy className="h-6 w-6 text-blue-600" />
           <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {event?.eventName} - 赛事成绩
+              {event?.eventName || '赛事'} - 赛事成绩
             </h2>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              共 {results.length} 名学生，{gameTypes.length} 个比赛项目
+              {!isCreating && !loading ? (
+                `共 ${results?.length || 0} 名学生，${gameTypes?.length || 0} 个比赛项目`
+              ) : (
+                '加载中...'
+              )}
             </p>
           </div>
         </div>
-        
-        <button
-          onClick={handleExport}
-          disabled={exporting}
-          className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
-        >
-          {exporting ? (
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-          ) : (
-            <Download className="h-4 w-4" />
-          )}
-          <span>{exporting ? '导出中...' : '导出Excel'}</span>
-        </button>
-      </div>
 
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={() => setShowUploadModal(true)}
+            disabled={isCreating}
+            className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
+          >
+            <Upload className="h-4 w-4" />
+            <span>导入成绩</span>
+          </button>
 
-
-      {/* Results table */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full divide-y divide-gray-200 dark:divide-gray-700" style={{ minWidth: 'max-content' }}>
-            <thead className="bg-gray-50 dark:bg-gray-700">
-              {/* Header row 1: Game type names */}
-              <tr>
-                <th
-                  rowSpan={2}
-                  className="px-2 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider border border-gray-200 dark:border-gray-600 whitespace-nowrap"
-                  style={{ minWidth: '100px' }}
-                >
-                  学生信息
-                </th>
-                {gameTypes.map(gameType => (
-                  <th
-                    key={gameType}
-                    colSpan={3}
-                    className="px-1 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider border border-gray-200 dark:border-gray-600 whitespace-nowrap"
-                    style={{ minWidth: '120px' }}
-                  >
-                    {gameType}
-                  </th>
-                ))}
-              </tr>
-              
-              {/* Header row 2: Column names */}
-              <tr>
-                {gameTypes.map(gameType => (
-                  <React.Fragment key={`${gameType}-headers`}>
-                    <th className="px-1 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider border border-gray-200 dark:border-gray-600 whitespace-nowrap" style={{ minWidth: '40px' }}>
-                      组别
-                    </th>
-                    <th className="px-1 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider border border-gray-200 dark:border-gray-600 whitespace-nowrap" style={{ minWidth: '60px' }}>
-                      成绩
-                    </th>
-                    <th className="px-1 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider border border-gray-200 dark:border-gray-600 whitespace-nowrap" style={{ minWidth: '40px' }}>
-                      名次
-                    </th>
-                  </React.Fragment>
-                ))}
-              </tr>
-            </thead>
-            
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {results.map((student, index) => {
-                const rowStyling = getRowStyling(student);
-                return (
-                  <tr
-                    key={`${student.name}-${index}`}
-                    className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${rowStyling}`}
-                  >
-                    {/* Student name */}
-                    <td className="px-2 py-1 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white border border-gray-200 dark:border-gray-600" style={{ minWidth: '100px' }}>
-                      <span className="text-sm">{student.name}</span>
-                    </td>
-                    
-                    {/* Game type results */}
-                    {gameTypes.map(gameType => {
-                      const gameResult = student.gameTypes[gameType];
-                      return (
-                        <React.Fragment key={`${student.name}-${gameType}`}>
-                          {/* Group name */}
-                          <td className="px-1 py-1 text-center text-xs text-gray-900 dark:text-white border border-gray-200 dark:border-gray-600 whitespace-nowrap" style={{ minWidth: '40px' }}>
-                            {gameResult?.groupName || ''}
-                          </td>
-                          
-                          {/* Result */}
-                          <td className="px-1 py-1 text-center text-xs text-gray-900 dark:text-white border border-gray-200 dark:border-gray-600 whitespace-nowrap" style={{ minWidth: '60px' }}>
-                            {gameResult?.result || ''}
-                          </td>
-                          
-                          {/* Position */}
-                          {renderPositionCell(gameResult)}
-                        </React.Fragment>
-                      );
-                    })}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <button
+            onClick={handleExport}
+            disabled={exporting || isCreating || (!results || results.length === 0)}
+            className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
+          >
+            {exporting ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            <span>{exporting ? '导出中...' : '导出Excel'}</span>
+          </button>
         </div>
       </div>
 
-      {/* Summary statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow">
-          <div className="flex items-center space-x-2">
-            <Users className="h-5 w-5 text-blue-600" />
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              参赛学生
-            </span>
-          </div>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white mt-2">
-            {results.length}
-          </p>
-        </div>
-        
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow">
-          <div className="flex items-center space-x-2">
-            <Trophy className="h-5 w-5 text-green-600" />
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              比赛项目
-            </span>
-          </div>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white mt-2">
-            {gameTypes.length}
-          </p>
-        </div>
-        
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow">
-          <div className="flex items-center space-x-2">
-            <Users className="h-5 w-5 text-purple-600" />
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              团队成员
-            </span>
-          </div>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white mt-2">
-            {results.filter(r => r.isTeamMember).length}
-          </p>
-        </div>
-      </div>
+      {/* Dynamic content */}
+      {renderContent()}
+
+      {/* Upload Modal */}
+      {showUploadModal && event && (
+        <ResultUploadModal
+          isOpen={showUploadModal}
+          onClose={() => setShowUploadModal(false)}
+          event={event}
+          onSuccess={handleUploadSuccess}
+        />
+      )}
     </div>
   );
 };
