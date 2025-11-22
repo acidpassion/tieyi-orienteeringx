@@ -17,6 +17,7 @@ import QuizResult from './pages/QuizResult';
 import CoachDashboard from './pages/coach/Dashboard';
 import Students from './pages/coach/Students';
 import StudentRoster from './pages/coach/StudentRoster';
+import RosterSplash from './pages/coach/RosterSplash';
 import Assignments from './pages/coach/Assignments';
 import AssignmentStatus from './pages/coach/AssignmentStatus';
 import StudentProfile from './pages/coach/StudentProfile';
@@ -112,6 +113,14 @@ function App() {
                   <Layout>
                     <StudentRoster />
                   </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/coach/roster/splash"
+              element={
+                <ProtectedRoute>
+                  <RosterSplash />
                 </ProtectedRoute>
               }
             />

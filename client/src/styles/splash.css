@@ -1,0 +1,114 @@
+/* Splash Screen Animation Styles */
+
+.splash-container {
+  overflow: hidden;
+  position: relative;
+}
+
+.bubble-enter {
+  animation: bubbleEnter 0.5s ease-out;
+}
+
+.bubble-exit {
+  animation: bubbleExit 0.5s ease-in;
+}
+
+@keyframes bubbleEnter {
+  from {
+    transform: scale(0) rotate(0deg);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) rotate(360deg);
+    opacity: 1;
+  }
+}
+
+@keyframes bubbleExit {
+  from {
+    transform: scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: scale(0);
+    opacity: 0;
+  }
+}
+
+/* Floating animation for background elements */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+.floating {
+  animation: float 6s ease-in-out infinite;
+}
+
+/* Gradient animation for background */
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animated-gradient {
+  background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+  background-size: 400% 400%;
+  animation: gradientShift 15s ease infinite;
+}
+
+/* Pulse animation for buttons */
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(255, 255, 255, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+  }
+}
+
+.pulse-button {
+  animation: pulse 2s infinite;
+}
+
+/* Smooth transitions */
+.smooth-transition {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Glass morphism effect */
+.glass {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Shimmer effect for loading */
+@keyframes shimmer {
+  0% {
+    background-position: -468px 0;
+  }
+  100% {
+    background-position: 468px 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  background-size: 468px 100%;
+  animation: shimmer 1.5s infinite;
+}
