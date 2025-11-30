@@ -485,22 +485,16 @@ router.post('/save-results/:externalGameId', verifyToken, verifyCoach, async (re
     // Calculate positions for ALL results (including all clubs for accurate ranking)
     const processedResults = await calculatePositions(deduplicatedResults, externalGameId);
 
-    // Filter results for students with clubName containing "铁一" and name exists in students collection
+    // Filter results for students with clubName containing "铁一" or in allowed clubs list, and name exists in students collection
     const validResults = processedResults.filter(result => {
       const clubName = result.clubName || '';
       const name = result.name || '';
+      const clubs = ["中山市定向运动协会", "广州一米体育艺术有限公司", "广州市白云区定向运动协会", "广州欧酷体育科技有限公司", "广州花迹体育发展有限公司", "广州轨迹体育发展有限公司", "斑马定向（南京）体育有限公司", "斑马定向（扬州）体育有限公司", "深圳市宝安区海韵学校（集团）海韵学校", "中山大学"];
+      
+      const isValidClub = clubName.includes('铁一') || clubs.includes(clubName);
+      const isValidStudent = studentNames.has(name) && isValidClub;
 
-      const isValidClub = clubName.includes('铁一');
-      const isValidStudent = studentNames.has(name);
-
-      // Special debug logging for the missing student
-      if (name === '凌子琪' || result.teamId === '249' || result.teamId === 249) {
-        console.log(`🔍 DEBUG - Team 249 member: ${name}, clubName: "${clubName}", teamId: ${result.teamId}, isValidClub: ${isValidClub}, isValidStudent: ${isValidStudent}`);
-      }
-
-      console.log(`🔍 Filtering result: ${name}, clubName: "${clubName}", isValidClub: ${isValidClub}, isValidStudent: ${isValidStudent}`);
-
-      return isValidClub && isValidStudent;
+      return isValidStudent;
     });
 
     logger.info('Filtered valid results for saving', {
